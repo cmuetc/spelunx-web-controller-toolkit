@@ -1,24 +1,37 @@
-# Essential Unity ignores
-/[Ll]ibrary/
-/[Tt]emp/
-/[Oo]bj/
-/[Bb]uild/
-/[Bb]uilds/
-/[Ll]ogs/
-/[Uu]ser[Ss]ettings/
-/[Mm]emoryCaptures/
-/[Rr]ecordings/
+# --- Unity Folders (Updated for Subfolder Support) ---
+# Removing the leading '/' allows these to match inside your subfolder
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
 
-# IDE/Cache/Builds
+# --- IDE & System Files ---
 .vs/
 .gradle/
+.idea/
 *.csproj
 *.sln
 *.suo
 *.user
+*.userprefs
 *.pidb
 *.pdb
 *.mdb
+*.opendb
+*.VC.db
+
+# --- Build Outputs ---
 *.apk
 *.aab
 *.unitypackage
+*.app
+*.exe
+
+# --- Unity Generated ---
+sysinfo.txt
+/[Aa]ssets/AssetStoreTools*

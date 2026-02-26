@@ -1,0 +1,222 @@
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: "Racing One", sans-serif;
+  overflow: hidden;
+}
+
+body, button, input, h1, h2, h3, p {
+  font-family: "Racing Sans One", sans-serif;
+}
+
+.racing-sans-one-regular {
+  font-family: "Racing Sans One", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
+/* Fix Safari 1-frame tap delay */
+* {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---------- GENERAL PAGE CONTAINERS ---------- */
+.logo {
+  width: 300px;
+  height: auto;
+  margin-bottom: 30px;
+  user-select: none;
+}
+
+
+#join, #pad {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.5s ease;
+}
+
+#join {
+  background: linear-gradient(180deg, #000000, #646464);
+  z-index: 2;
+  background: url('TeamBG.png');
+  background-size: 100% auto;
+}
+
+#join.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#join h2 { font-size: 28px; margin-bottom: 12px; }
+#join input[type=text] {
+  width: 60%; border: none; border-radius: 10px; 
+  padding: 15px; font-size: 20px; margin: 15px 0;
+  background: #e2e2e2;
+}
+#join button {
+  padding: 12px 20px; font-size: 18px; margin-top: 20px;
+  border: none; border-radius: 10px;
+  background: #2c2c2c; color: white;
+}
+
+.cheer img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  user-select: none;
+  pointer-events: none;
+}
+
+
+#status { margin-top: 10px; color: #e67e22; }
+
+
+/* TEAM SELECT PAGE */
+#teamSelect {   
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: linear-gradient(180deg, #000000, #353535);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 30px;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+  z-index: 2;
+  pointer-events: auto;
+  background: url('TeamBG.png');
+  background-size: 100% auto;
+}
+
+#teamSelect.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.team-btn {
+  width: 70%;
+  max-width: 380px;
+  background: none;
+  border: none;
+  padding: 0;
+  transition: transform 0.2s ease;
+}
+
+.team-btn img {
+  width: 60%;
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.4);
+}
+
+.team-btn:active {
+  transform: scale(0.92);
+}
+
+#teamSelect h2 {
+  color: white;
+  font-size: 32px;
+  flex-shrink: 0;
+  margin-top: 80px;
+  margin-bottom: 0px;
+}
+
+
+/* ---------- CONTROLLER PAGE ---------- */
+#pad {
+  background: linear-gradient(135deg, #ff7a00, #ff2200, #000);
+  opacity: 0; pointer-events: none; z-index: 1;
+}
+
+#pad.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* ENERGY BAR */
+.energy-row {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  width: 90%;
+  max-width: 400px;
+  z-index: 10;
+}
+
+.energy-container {
+  position: relative;
+  flex: 1;
+  height: 40px;
+  background: #ffffff;
+  border: 3px solid #000;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.energy-value {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #000;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(255,255,255,0.6);
+  pointer-events: none;
+}
+
+.energy-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff0000, #ff8800);
+  width: 100%;
+  transition: width 0.1s linear;
+}
+
+/* CHEER BUTTON */
+.cheer {
+  width: 270px;
+  height: 270px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  transition: transform 0.15s ease;
+  margin-bottom: 230px;
+
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.cheer img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  user-select: none;
+  pointer-events: none;
+}
+
+.cheer:active {
+  transform: scale(0.9);
+}
+
+.cheer.animate {
+  animation: pulse 0.25s ease;
+}
+
+@keyframes pulse {
+  0%   { transform: scale(1.0); filter: brightness(1); }
+  50%  { transform: scale(1.15); filter: brightness(1.3); }
+  100% { transform: scale(1.0); filter: brightness(1); }
+}

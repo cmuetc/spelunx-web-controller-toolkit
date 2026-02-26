@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, user-scalable=no"/>
+  <title>Cheer Controller</title>
+
+  <!-- Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Racing+Sans+One&display=swap" rel="stylesheet">
+
+
+  <link rel="stylesheet" href="controller.css">
+</head>
+<body>
+
+  <!-- JOIN SCREEN -->
+  <div id="join">
+    <img src="270logo.png" class="logo" alt="Game Logo">
+
+    <input id="code" type="text" placeholder="Room Code " maxlength="4"/>
+    <input id="name" type="text" placeholder="Your Name" maxlength="16"/>
+    <button id="joinBtn" >Join Game</button>
+    <p id="status"></p>
+  </div>
+
+  <!-- TEAM SELECT SCREEN -->
+  <div id="teamSelect" class="hidden">
+    <h2>Select Your Team</h2>
+
+    <button class="team-btn" data-team="red">
+      <img src="TeamTempest.png" alt="Red Team">
+    </button>
+
+    <button class="team-btn" data-team="blue">
+      <img src="TeamSonic.png" alt="Blue Team">
+    </button>
+
+    <button class="team-btn" data-team="green">
+      <img src="TeamPhantom.png" alt="Green Team">
+    </button>
+    <p id="teamStatus"></p>
+  </div>
+
+  <!-- CONTROLLER -->
+  <div id="pad">
+    <div class="energy-row">
+      <div class="energy-container">
+        <div class="energy-fill" id="energyFill"></div>
+        <div id="energyValue" class="energy-value">100%</div>
+      </div>
+    </div>
+
+    <div class="cheer" id="cheerBtn">
+      <audio id="sfxEmpty" src="energy0.wav" preload="auto"></audio>
+      <img id="cheerImg" src="" alt="Cheer Button"/>
+    </div>
+  </div>
+
+  <!-- External JS -->
+  <script src="controller.js"></script>
+</body>
+</html>
