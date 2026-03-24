@@ -1,77 +1,71 @@
+// PlayerInputRouter.cs
+// Inherit from this and override the methods you need.
+// Attach the subclass to a GameObject and assign it to HostClient.router in the Inspector.
+//
+// HostClient calls:
+//   OnPlayerJoined(id, name, team)   — when a player connects
+//   OnPlayerLeft(id)                 — when a player disconnects
+//   OnButtonInput(id, btn, state)    — on every button event
+//
+// For most game logic you'll want to poll HostClient.Players[id] in Update()
+// rather than reacting to every raw button event here.
+ 
 using UnityEngine;
-using System.Collections.Generic;
-using static UnityEngine.EventSystems.EventTrigger;
-
+ 
 public class PlayerInputRouter : MonoBehaviour
 {
-    private readonly Dictionary<string, PlayerState> _players = new();
-
-    public class PlayerState
+    // Reference back to the host — set automatically if on the same GameObject,
+    // or assign manually in the Inspector.
+    public HostClient hostClient;
+ 
+    protected virtual void Awake()
     {
-        public string team;
-        public string name;
-        public int totalEnergy;   // total energy accumulated for that player
+        if (hostClient == null) hostClient = GetComponent<HostClient>();
     }
-
-    [Header("Energy Settings")]
-    public float decayRatePerSecond = 3f; // energy lost per second
-    public int minEnergy = 0;
-
-
-    public event System.Action<string, string, int> OnPlayerTap;
-
-
-    public void OnPlayerJoined(string playerId, string name, string team)
+ 
+    // ---- Called by HostClient ----
+ 
+    /// A new player connected. team = "red" | "blue" | "green"
+    public virtual void OnPlayerJoined(string id, string name, string team)
     {
-        if (!_players.TryGetValue(playerId, out var ps))
-            _players[playerId] = ps = new PlayerState();
-
-        ps.team = team;
-        ps.name = name;
-        ps.totalEnergy = 0;
-        Debug.Log($"[JOIN] {playerId} {name} assigned to team {team}");
+        Debug.Log($"[Router] Player joined: {name} ({team})");
     }
-
-    public void OnPlayerLeft(string playerId)
+ 
+    /// A player disconnected.
+    public virtual void OnPlayerLeft(string id)
     {
-        if (_players.Remove(playerId))
-            Debug.Log($"[LEAVE] {playerId} removed from router");
+        Debug.Log($"[Router] Player left: {id}");
     }
-
-    // === ENERGY UPDATE FROM CONTROLLER ===
-    public void OnEnergyUpdate(string playerId, string btn, int energyPulse)
+ 
+    /// Raw button event.
+    /// btn   = "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight" | "Jump"
+    /// state = "down" | "hold" | "up"
+    public virtual void OnButtonInput(string id, string btn, string state)
     {
-        if (!_players.TryGetValue(playerId, out var ps))
-            _players[playerId] = ps = new PlayerState();
-
-        // Each tap gives "energyPulse" amount (not absolute)
-        ps.totalEnergy += energyPulse;
-
-        Debug.Log($"[ENERGY] {playerId} +{energyPulse} (Total={ps.totalEnergy}) (Team={ps.team})");
-
-        //Trigger the energy ball
-        OnPlayerTap?.Invoke(playerId, ps.team, energyPulse);
+        // Optional: react to individual button events.
+        // For held-state polling, read hostClient.Players[id] in Update() instead.
     }
-
-    // === GETTERS ===
-
-    public List<string> getPlayerNames(string team)
+ 
+    // ---- Convenience: poll all players each frame ----
+    protected virtual void Update()
     {
-        List<string> names = new List<string>();
-        foreach (var kv in _players)
+        if (hostClient == null) return;
+ 
+        foreach (var player in hostClient.Players.Values)
         {
-            if (kv.Value.team == team)
-            {
-                names.Add(kv.Value.name);
-            }
+            // player.up / down / left / right / jump  — held booleans
+            // player.jumpPressed                       — true this frame only
+            // player.jumpReleased                      — true this frame only
+            // player.DirectionVector                   — Vector2 (-1..1, -1..1)
+            // player.team                              — "red" | "blue" | "green"
+            // player.playerName                        — display name
+ 
+            // Example: log direction while any key held
+            if (player.DirectionVector.sqrMagnitude > 0)
+                Debug.Log($"{player.playerName} dir={player.DirectionVector}");
+ 
+            if (player.jumpPressed)
+                Debug.Log($"{player.playerName} jumped!");
         }
-
-        return names;
     }
-
-    public List<string> GetAllPlayerIds()
-    {
-        return new List<string>(_players.Keys);
-    }
-
 }
