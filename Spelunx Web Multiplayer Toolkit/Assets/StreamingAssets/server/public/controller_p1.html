@@ -1,0 +1,248 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, user-scalable=no"/>
+  <title>Player 1 · Slider</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #f0c040;
+      --bg: #0d0d0d;
+      --panel: #161616;
+      --border: rgba(240,192,64,0.2);
+      --text: #f5f0e8;
+    }
+    *, *::before, *::after { box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; overflow: hidden; }
+
+    body {
+      background-image:
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(240,192,64,0.04) 39px, rgba(240,192,64,0.04) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(240,192,64,0.04) 39px, rgba(240,192,64,0.04) 40px);
+    }
+
+    #pad {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 40px;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+    #pad.active { opacity: 1; pointer-events: all; }
+
+    .slot-badge {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 13px;
+      letter-spacing: 0.3em;
+      color: var(--accent);
+      opacity: 0.7;
+      text-transform: uppercase;
+    }
+
+    .big-label {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(52px, 14vw, 80px);
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      line-height: 1;
+      text-shadow: 0 0 40px rgba(240,192,64,0.3);
+    }
+
+    .slider-wrap {
+      width: min(340px, 85vw);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .value-display {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 72px;
+      letter-spacing: 0.05em;
+      color: #fff;
+      line-height: 1;
+      min-width: 3ch;
+      text-align: center;
+      transition: color 0.15s;
+    }
+
+    .slider-track {
+      position: relative;
+      width: 100%;
+      height: 64px;
+      display: flex;
+      align-items: center;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      background: transparent;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type=range]::-webkit-slider-runnable-track {
+      height: 8px;
+      background: var(--panel);
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 3px solid #fff;
+      margin-top: -22px;
+      box-shadow: 0 0 20px rgba(240,192,64,0.5);
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+
+    input[type=range]:active::-webkit-slider-thumb {
+      transform: scale(1.15);
+      box-shadow: 0 0 36px rgba(240,192,64,0.8);
+    }
+
+    .range-labels {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: rgba(255,255,255,0.3);
+    }
+
+    #status {
+      font-size: 12px;
+      letter-spacing: 0.15em;
+      color: rgba(255,255,255,0.35);
+      text-transform: uppercase;
+    }
+
+    #disconnected {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.9);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 16px; z-index: 10;
+      transition: opacity 0.3s;
+    }
+    #disconnected.hidden { opacity: 0; pointer-events: none; }
+    #disconnected p { color: white; font-size: 20px; font-weight: 700; margin: 0; letter-spacing: 0.1em; }
+    #disconnected button {
+      padding: 12px 32px; font-size: 14px; border: none; border-radius: 10px;
+      cursor: pointer; font-family: inherit; font-weight: 500; letter-spacing: 0.08em;
+    }
+    #reconnectBtn { background: var(--accent); color: #000; }
+    #backBtn { background: #2a2a2a; color: #888; margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<div id="pad">
+  <div class="slot-badge">Player 1 · Slot 01</div>
+  <div class="big-label">SLIDER</div>
+
+  <div class="slider-wrap">
+    <div class="value-display" id="valDisplay">50</div>
+    <div class="slider-track">
+      <input type="range" id="slider" min="0" max="100" value="50" step="1">
+    </div>
+    <div class="range-labels"><span>0</span><span>50</span><span>100</span></div>
+  </div>
+
+  <div id="status">Connecting…</div>
+</div>
+
+<div id="disconnected" class="hidden">
+  <p>Disconnected</p>
+  <button id="reconnectBtn">Reconnect</button>
+  <button id="backBtn">Back</button>
+</div>
+
+
+<script>
+function qs(k){ return new URLSearchParams(location.search).get(k); }
+const code         = (qs("code")||"").toUpperCase();
+const name         = qs("name")||"Player";
+const slotFromUrl  = parseInt(qs("slot")||"0");  // hint passed by join.html
+if (!code) location.href = "join.html";
+
+const slotPages = {
+  1: "controller_p1.html",
+  2: "controller_p2.html",
+  3: "controller_p3.html",
+  4: "controller_p4.html"
+};
+
+// Show expected slot immediately from URL hint (no flicker waiting for WS)
+if (slotFromUrl) {
+  const badge = document.querySelector(".slot-badge");
+  if (badge) badge.textContent = `Player ${slotFromUrl} · Slot 0${slotFromUrl}`;
+}
+
+let ws = null;
+
+const statusEl   = document.getElementById("status");
+const slider     = document.getElementById("slider");
+const valDisplay = document.getElementById("valDisplay");
+function send(o){ if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(o)); }
+let lastVal = 50;
+slider.addEventListener("input", () => {
+  const v = parseInt(slider.value);
+  valDisplay.textContent = v;
+  valDisplay.style.color = v > 75 ? "#ff6644" : v < 25 ? "#44aaff" : "#fff";
+  if (v !== lastVal) { lastVal = v; send({ t: "slider", value: v }); }
+});
+
+function connect() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${proto}://${location.host}/ws?role=client&code=${encodeURIComponent(code)}&name=${encodeURIComponent(name)}`);
+  statusEl.textContent = "Connecting…";
+
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.t === "joined") {
+      // If server assigned a different slot than expected, redirect to correct page
+      if (slotFromUrl && msg.slot !== slotFromUrl) {
+        const page = slotPages[msg.slot] || slotPages[1];
+        const p = new URLSearchParams({ code, name, slot: msg.slot });
+        location.href = page + "?" + p;
+        return;
+      }
+      const badge = document.querySelector(".slot-badge");
+      if (badge) badge.textContent = `Player ${msg.slot} · Slot 0${msg.slot}`;
+      statusEl.textContent = `Slot ${msg.slot} · ${name}`;
+      document.getElementById("pad").classList.add("active");
+      heartbeat();
+    }
+    
+  };
+
+  ws.onclose = () => {
+    statusEl.textContent = "Disconnected";
+    document.getElementById("pad").classList.remove("active");
+    document.getElementById("disconnected").classList.remove("hidden");
+  };
+}
+
+function heartbeat() {
+  if (ws?.readyState === WebSocket.OPEN) { send({ t: "ping" }); setTimeout(heartbeat, 10000); }
+}
+
+document.getElementById("reconnectBtn").onclick = () => {
+  document.getElementById("disconnected").classList.add("hidden"); connect();
+};
+document.getElementById("backBtn").onclick = () => location.href = "join.html";
+
+connect();
+</script>
+</body>
+</html>

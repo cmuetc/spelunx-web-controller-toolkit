@@ -4,82 +4,198 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, user-scalable=no"/>
   <title>Join Game</title>
-  <link rel="stylesheet" href="join.css">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      height: 100%; margin: 0;
+      font-family: 'DM Mono', monospace;
+      background: #080808; color: #f0ece4; overflow: hidden;
+    }
+    body {
+      background-image:
+        radial-gradient(ellipse 70% 50% at 50% 100%, rgba(255,68,0,0.12) 0%, transparent 60%),
+        repeating-linear-gradient(0deg, transparent, transparent 47px, rgba(255,68,0,0.05) 47px, rgba(255,68,0,0.05) 48px),
+        repeating-linear-gradient(90deg, transparent, transparent 47px, rgba(255,68,0,0.05) 47px, rgba(255,68,0,0.05) 48px);
+    }
+
+    #screen {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 18px; padding: 24px;
+    }
+
+    .logo-wrap svg { filter: drop-shadow(0 0 24px rgba(255,68,0,0.4)); }
+
+    .form-group { display: flex; flex-direction: column; gap: 12px; width: min(300px, 88vw); }
+
+    input[type=text] {
+      width: 100%;
+      background: rgba(255,255,255,0.05);
+      border: 1.5px solid rgba(255,68,0,0.25);
+      border-radius: 10px; padding: 14px 18px;
+      font-size: 17px; color: #fff; outline: none;
+      font-family: inherit; letter-spacing: 0.04em;
+      transition: border-color 0.2s;
+    }
+    input[type=text]::placeholder { color: rgba(255,255,255,0.2); }
+    input[type=text]:focus { border-color: rgba(255,68,0,0.7); }
+
+    #codeInput {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 32px; text-align: center;
+      letter-spacing: 0.25em; text-transform: uppercase;
+    }
+
+    #joinBtn {
+      width: min(300px, 88vw); padding: 15px;
+      font-size: 18px; border: none; border-radius: 10px;
+      background: #ff4400; color: white; cursor: pointer;
+      font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.15em;
+      transition: background 0.15s, transform 0.1s;
+      box-shadow: 0 4px 24px rgba(255,68,0,0.3);
+    }
+    #joinBtn:active { background: #cc3300; transform: scale(0.97); }
+    #joinBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #status { min-height: 20px; font-size: 13px; letter-spacing: 0.1em; color: #ff8844; text-align: center; }
+
+    .slot-legend { display: flex; flex-direction: column; gap: 6px; width: min(300px, 88vw); margin-top: 4px; }
+    .slot-row {
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 8px; padding: 8px 12px;
+      font-size: 12px; letter-spacing: 0.06em; color: rgba(255,255,255,0.35);
+    }
+    .slot-num { font-family: 'Bebas Neue', sans-serif; font-size: 15px; letter-spacing: 0.1em; color: rgba(255,255,255,0.5); min-width: 28px; }
+    .slot-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    #connecting {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.92);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 20px; z-index: 20; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    }
+    #connecting.show { opacity: 1; pointer-events: all; }
+    #connecting p { color: white; font-size: 18px; letter-spacing: 0.15em; margin: 0; text-transform: uppercase; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid rgba(255,68,0,0.2); border-top-color: #ff4400;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
 <body>
- 
-  <!-- JOIN SCREEN -->
-  <div id="join">
- 
-    <!-- LOGO: inline SVG -->
-    <svg class="logo" viewBox="0 0 260 80" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0" y="0" width="260" height="80" rx="12" fill="#111"/>
-      <!-- Chequered flag strip -->
-      <rect x="0" y="0" width="260" height="80" rx="12" fill="none" stroke="#fff" stroke-width="2" opacity="0.15"/>
-      <g opacity="0.12">
-        <rect x="0"   y="0"  width="20" height="20" fill="#fff"/>
-        <rect x="20"  y="20" width="20" height="20" fill="#fff"/>
-        <rect x="240" y="0"  width="20" height="20" fill="#fff"/>
-        <rect x="220" y="20" width="20" height="20" fill="#fff"/>
-      </g>
-      <!-- "270" number plate style -->
-      <text x="130" y="36" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="900" font-size="28" fill="#ff4400" letter-spacing="4">270</text>
-      <text x="130" y="62" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="700" font-size="15" fill="#ffffff" letter-spacing="6">RACING</text>
+
+<div id="screen">
+  <div class="logo-wrap">
+    <svg width="220" height="64" viewBox="0 0 220 64" xmlns="http://www.w3.org/2000/svg">
+      <rect width="220" height="64" rx="10" fill="#111"/>
+      <rect width="220" height="64" rx="10" fill="none" stroke="#fff" stroke-width="1.5" opacity="0.1"/>
+      <polygon points="84,12 68,36 82,36 66,54 104,28 90,28 106,12" fill="#ff4400" opacity="0.9"/>
+      <text x="118" y="28" font-family="'Bebas Neue',sans-serif" font-size="22" fill="#ff4400" letter-spacing="3">CTRL</text>
+      <text x="118" y="50" font-family="'DM Mono',monospace" font-size="11" fill="rgba(255,255,255,0.4)" letter-spacing="4">RELAY</text>
     </svg>
- 
-    <input id="code" type="text" placeholder="Room Code" maxlength="4"/>
-    <input id="name" type="text" placeholder="Your Name" maxlength="16"/>
-    <button id="joinBtn">Join Game</button>
-    <p id="status"></p>
   </div>
- 
-  <!-- TEAM SELECT SCREEN -->
-  <div id="teamSelect" class="hidden">
-    <h2>Select Your Team</h2>
- 
-    <!-- Team Tempest (red) -->
-    <button class="team-btn" data-team="red">
-      <svg viewBox="0 0 280 80" xmlns="http://www.w3.org/2000/svg">
-        <rect width="280" height="80" rx="14" fill="#cc2200"/>
-        <rect width="280" height="80" rx="14" fill="none" stroke="#ff6644" stroke-width="1.5" opacity="0.5"/>
-        <!-- Lightning bolt -->
-        <polygon points="110,14 90,44 108,44 88,68 130,34 112,34 132,14" fill="#ffdd00" opacity="0.95"/>
-        <text x="152" y="34" font-family="system-ui,sans-serif" font-weight="900" font-size="20" fill="#fff" letter-spacing="2">TEMPEST</text>
-        <text x="152" y="56" font-family="system-ui,sans-serif" font-weight="600" font-size="13" fill="#ffaa88" letter-spacing="3">TEAM RED</text>
-      </svg>
-    </button>
- 
-    <!-- Team Sonic (blue) -->
-    <button class="team-btn" data-team="blue">
-      <svg viewBox="0 0 280 80" xmlns="http://www.w3.org/2000/svg">
-        <rect width="280" height="80" rx="14" fill="#0044cc"/>
-        <rect width="280" height="80" rx="14" fill="none" stroke="#4488ff" stroke-width="1.5" opacity="0.5"/>
-        <!-- Sound wave arcs -->
-        <path d="M80,40 Q90,24 100,40 Q110,56 120,40" fill="none" stroke="#66aaff" stroke-width="3" stroke-linecap="round"/>
-        <path d="M70,40 Q88,16 106,40 Q124,64 142,40" fill="none" stroke="#4488ff" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
-        <text x="158" y="34" font-family="system-ui,sans-serif" font-weight="900" font-size="20" fill="#fff" letter-spacing="2">SONIC</text>
-        <text x="158" y="56" font-family="system-ui,sans-serif" font-weight="600" font-size="13" fill="#88bbff" letter-spacing="3">TEAM BLUE</text>
-      </svg>
-    </button>
- 
-    <!-- Team Phantom (green) -->
-    <button class="team-btn" data-team="green">
-      <svg viewBox="0 0 280 80" xmlns="http://www.w3.org/2000/svg">
-        <rect width="280" height="80" rx="14" fill="#006655"/>
-        <rect width="280" height="80" rx="14" fill="none" stroke="#44ffcc" stroke-width="1.5" opacity="0.5"/>
-        <!-- Ghost shape -->
-        <path d="M90,62 L90,28 Q90,14 104,14 Q118,14 118,28 L118,62 Q114,56 111,62 Q108,56 104,62 Q100,56 97,62 Q94,56 90,62 Z" fill="#44ffcc" opacity="0.9"/>
-        <circle cx="100" cy="32" r="3" fill="#006655"/>
-        <circle cx="110" cy="32" r="3" fill="#006655"/>
-        <text x="136" y="34" font-family="system-ui,sans-serif" font-weight="900" font-size="20" fill="#fff" letter-spacing="2">PHANTOM</text>
-        <text x="136" y="56" font-family="system-ui,sans-serif" font-weight="600" font-size="13" fill="#88ffdd" letter-spacing="3">TEAM GREEN</text>
-      </svg>
-    </button>
- 
-    <p id="teamStatus"></p>
+
+  <div class="form-group">
+    <input id="codeInput" type="text" placeholder="CODE" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false"/>
+    <input id="nameInput" type="text" placeholder="Your name" maxlength="16" autocomplete="off"/>
   </div>
- 
-  <script src="join.js"></script>
+
+  <button id="joinBtn">Join Game</button>
+  <p id="status"></p>
+
+  <div class="slot-legend">
+    <div class="slot-row"><span class="slot-num">P1</span><span class="slot-dot" style="background:#f0c040"></span><span>Slider controller</span></div>
+    <div class="slot-row"><span class="slot-num">P2</span><span class="slot-dot" style="background:#00e5ff"></span><span>Messenger (send text)</span></div>
+    <div class="slot-row"><span class="slot-num">P3</span><span class="slot-dot" style="background:#ff3366"></span><span>Action button</span></div>
+    <div class="slot-row"><span class="slot-num">P4</span><span class="slot-dot" style="background:#44ff99"></span><span>Display (reads P2's messages)</span></div>
+  </div>
+</div>
+
+<div id="connecting">
+  <div class="spinner"></div>
+  <p id="connectMsg">Joining room…</p>
+</div>
+
+<script>
+function qs(k){ return new URLSearchParams(location.search).get(k); }
+
+const slotPages = {
+  1: "controller_p1.html",
+  2: "controller_p2.html",
+  3: "controller_p3.html",
+  4: "controller_p4.html"
+};
+
+document.getElementById("joinBtn").addEventListener("click", doJoin);
+document.getElementById("codeInput").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("nameInput").focus(); });
+document.getElementById("nameInput").addEventListener("keydown", e => { if (e.key === "Enter") doJoin(); });
+
+function doJoin() {
+  const code = document.getElementById("codeInput").value.trim().toUpperCase();
+  const name = document.getElementById("nameInput").value.trim() || "Player";
+  const st   = document.getElementById("status");
+
+  if (!code || code.length < 4) { st.textContent = "Enter a 4-letter room code."; return; }
+
+  st.textContent = "";
+  document.getElementById("joinBtn").disabled = true;
+  document.getElementById("connecting").classList.add("show");
+
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  // ── Single connection.  The server assigns the slot and sends it back.
+  // We immediately redirect, passing code+name so the controller page
+  // opens its OWN persistent connection using the same credentials.
+  // No second "probe" connection — the join.html WS is closed right after redirect.
+  const ws = new WebSocket(`${proto}://${location.host}/ws?role=client&code=${encodeURIComponent(code)}&name=${encodeURIComponent(name)}`);
+
+  let done = false;
+
+  ws.onmessage = e => {
+    if (done) return;
+    const msg = JSON.parse(e.data);
+
+    if (msg.t === "joined") {
+      done = true;
+      // Close join.html's connection — the controller page will open a fresh one
+      // with the same name and will reclaim the same slot (reserved by name).
+      ws.close();
+      const slot = msg.slot;
+      document.getElementById("connectMsg").textContent = `You are Player ${slot}!`;
+      setTimeout(() => {
+        const params = new URLSearchParams({ code, name, slot });
+        location.href = (slotPages[slot] || slotPages[1]) + "?" + params;
+      }, 500);
+    }
+
+    if (msg.t === "error") {
+      done = true;
+      ws.close();
+      document.getElementById("connecting").classList.remove("show");
+      document.getElementById("joinBtn").disabled = false;
+      st.textContent = msg.reason || "Could not join.";
+    }
+  };
+
+  ws.onerror = () => {
+    if (done) return;
+    done = true;
+    document.getElementById("connecting").classList.remove("show");
+    document.getElementById("joinBtn").disabled = false;
+    st.textContent = "Connection failed. Check the room code.";
+  };
+}
+
+// Auto-fill from QR-code URL
+const cq = qs("code"), nq = qs("name");
+if (cq) {
+  document.getElementById("codeInput").value = cq.toUpperCase();
+  if (nq) document.getElementById("nameInput").value = nq;
+}
+</script>
 </body>
 </html>
- 

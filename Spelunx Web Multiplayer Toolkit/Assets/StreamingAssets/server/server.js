@@ -2,134 +2,170 @@
 const express = require("express");
 const { WebSocketServer } = require("ws");
 const { customAlphabet } = require("nanoid");
-
-// 4-char code, no ambiguous letters
-const nanoCode = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 4);
-
-const PORT = process.env.PORT || 3010;
-
+ 
+const nanoCode   = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 4);
+const nanoId     = customAlphabet("0123456789abcdef", 8);
+const MAX_SLOTS  = 4;
+const PORT       = process.env.PORT || 3010;
+ 
 const app = express();
-app.use(express.static("public")); // serves controller.html at /controller.html
-
-const server = app.listen(PORT, () => {
-  console.log("Relay listening on http://localhost:" + PORT);
-});
-
-const wss = new WebSocketServer({ server, path: "/ws" });
-const rooms = new Map();
-
+app.use(express.static("public"));
+const server = app.listen(PORT, () => console.log("Relay on http://localhost:" + PORT));
+const wss    = new WebSocketServer({ server, path: "/ws" });
+const rooms  = new Map();
+ 
+// ── helpers ──────────────────────────────────────────────────────────────────
+ 
 function safeSend(ws, obj) {
   try { ws.readyState === ws.OPEN && ws.send(JSON.stringify(obj)); } catch {}
 }
+ 
 function broadcastToHost(code, msg) {
   const r = rooms.get(code);
-  if (r && r.host && r.host.readyState === r.host.OPEN) safeSend(r.host, msg);
+  if (r?.host?.readyState === r?.host?.OPEN) safeSend(r.host, msg);
 }
-
-function makeRoom(ws) {
+ 
+// ── room ─────────────────────────────────────────────────────────────────────
+ 
+function makeRoom(hostWs) {
   let tries = 0, code;
   do { code = nanoCode(); tries++; } while (rooms.has(code) && tries < 10);
-  rooms.set(code, { host: ws, clients: new Map(), createdAt: Date.now() });
+ 
+  // slots[1..4]:  null = empty, or { name, clientId, ws }
+  // ws = null means reserved-but-disconnected (player can reclaim by same name)
+  const slots = new Map([[1,null],[2,null],[3,null],[4,null]]);
+ 
+  rooms.set(code, { host: hostWs, clients: new Map(), slots, createdAt: Date.now() });
   return code;
 }
-
+ 
 function closeRoom(code) {
   const r = rooms.get(code);
   if (!r) return;
   for (const [, cws] of r.clients) { try { cws.close(1011, "Host closed"); } catch {} }
   rooms.delete(code);
 }
-
-function findClient(ws) {
-  for (const [code, room] of rooms) {
-    for (const [cid, cws] of room.clients) {
-      if (cws === ws) return { code, cid };
-    }
-  }
-  return null;
-}
-
+ 
+// ── connection ────────────────────────────────────────────────────────────────
+ 
 wss.on("connection", (ws, req) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  const role = url.searchParams.get("role"); // "host" or "client"
-
+  const url  = new URL(req.url, `http://${req.headers.host}`);
+  const role = url.searchParams.get("role");
+ 
+  // ═══════════════════════════════════════ HOST
   if (role === "host") {
-    // Create a room for this host
     const code = makeRoom(ws);
     ws._roomCode = code;
     safeSend(ws, { t: "room_created", code });
-
-    ws.on("message", (data) => {
-      let msg;
-      try { msg = JSON.parse(data.toString()); } catch { return; }
-      // (Optional) Handle host->server messages here if needed
-      // e.g., start game, broadcast state to clients, etc.
+ 
+    ws.on("message", raw => {
+      let msg; try { msg = JSON.parse(raw.toString()); } catch { return; }
+ 
       if (msg.t === "broadcast_to_clients") {
         const r = rooms.get(code);
-        if (r) {
-          for (const [, cws] of r.clients) safeSend(cws, { t: "host_broadcast", payload: msg.payload });
-        }
+        if (r) for (const [, cws] of r.clients)
+          safeSend(cws, { t: "host_broadcast", payload: msg.payload });
+      }
+ 
+      if (msg.t === "send_to_slot") {
+        const seat = rooms.get(code)?.slots.get(msg.slot);
+        if (seat?.ws) safeSend(seat.ws, { t: "slot_message", payload: msg.payload });
       }
     });
-
+ 
     ws.on("close", () => closeRoom(code));
     return;
   }
-
+ 
+  // ═══════════════════════════════════════ CLIENT
   if (role === "client") {
     const code = (url.searchParams.get("code") || "").toUpperCase();
     const name = (url.searchParams.get("name") || "Player").slice(0, 16);
-
+ 
     const room = rooms.get(code);
     if (!room || room.host.readyState !== room.host.OPEN) {
       safeSend(ws, { t: "error", reason: "Room not found" });
       ws.close(1008, "Room not found");
       return;
     }
-
-    const clientId = customAlphabet("0123456789abcdef", 8)();
-    const requestedTeam = url.searchParams.get("team");
-    const validTeams = ["red", "blue", "green"];
-    const team = validTeams.includes(requestedTeam) ? requestedTeam : "red";
+ 
+    // ── Slot assignment ──────────────────────────────────────────────────────
+    // Priority 1: reclaim own disconnected seat (matched by name)
+    // Priority 2: lowest free seat (null)
+    // If all 4 seats occupied by different live/reserved names → reject
+    let slot = null;
+ 
+    for (const [n, seat] of room.slots) {
+      if (seat && seat.name === name && seat.ws === null) { slot = n; break; }
+    }
+    if (slot === null) {
+      for (const [n, seat] of room.slots) {
+        if (seat === null) { slot = n; break; }
+      }
+    }
+    if (slot === null) {
+      safeSend(ws, { t: "error", reason: "Room is full (4/4 seats taken)" });
+      ws.close(1008, "Room full");
+      return;
+    }
+ 
+    const clientId = nanoId();
+    room.slots.set(slot, { name, clientId, ws });
     room.clients.set(clientId, ws);
+ 
     ws._roomCode = code;
     ws._clientId = clientId;
-    ws._team = team;
-
-
-    // Acknowledge to client & notify host
-    safeSend(ws, { t: "joined", id: clientId, code, name, team });
-    broadcastToHost(code, { t: "player_joined", id: clientId, name, team });
-
-    ws.on("message", (data) => {
-      let msg;
-      try { msg = JSON.parse(data.toString()); } catch { return; }
-
-      // Forward inputs to host
-      // Expected messages from client:
-      // { t:"btn", id, btn:"A"/"B"/"Up"/"Down"/"Left"/"Right", state:"down"|"up" }
-      // { t:"axes", id, x:float, y:float }
-      // { t:"ping" }
+    ws._slot     = slot;
+    ws._name     = name;
+ 
+    safeSend(ws, { t: "joined", id: clientId, code, name, slot });
+    broadcastToHost(code, { t: "player_joined", id: clientId, name, slot });
+ 
+    // ── Messages ─────────────────────────────────────────────────────────────
+    ws.on("message", raw => {
+      let msg; try { msg = JSON.parse(raw.toString()); } catch { return; }
+ 
       if (msg.t === "ping") { safeSend(ws, { t: "pong" }); return; }
-
+ 
+      if (msg.t === "slider") {
+        broadcastToHost(code, { t: "slider", id: clientId, slot, value: msg.value });
+        return;
+      }
+ 
+      if (msg.t === "text_msg") {
+        broadcastToHost(code, { t: "text_msg", id: clientId, slot, text: msg.text });
+        // forward directly to slot-4 if connected
+        const seat4 = room.slots.get(4);
+        if (seat4?.ws) safeSend(seat4.ws, { t: "incoming_text", text: msg.text, from: name });
+        return;
+      }
+ 
+      if (msg.t === "action_btn") {
+        broadcastToHost(code, { t: "action_btn", id: clientId, slot, state: msg.state, presses: msg.presses });
+        return;
+      }
+ 
+      // legacy d-pad / axes
       if (msg.t === "btn" || msg.t === "axes") {
-        msg.id = ws._clientId; // enforce correct id
-        broadcastToHost(code, msg);
+        broadcastToHost(code, { ...msg, id: clientId, slot });
       }
     });
-
+ 
+    // ── Disconnect: keep seat reserved by name; just null out the ws ─────────
     ws.on("close", () => {
       const r = rooms.get(code);
-      if (r) {
-        r.clients.delete(clientId);
-        broadcastToHost(code, { t: "player_left", id: clientId });
+      if (!r) return;
+      r.clients.delete(clientId);
+      const seat = r.slots.get(slot);
+      if (seat && seat.clientId === clientId) {
+        seat.ws = null; // seat stays reserved for this name
       }
+      broadcastToHost(code, { t: "player_left", id: clientId, slot });
     });
-
+ 
     return;
   }
-
-  // Unknown role
+ 
   safeSend(ws, { t: "error", reason: "Invalid role" });
   ws.close(1008, "Invalid role");
 });

@@ -1,0 +1,241 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, user-scalable=no"/>
+  <title>Player 3 · Action</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #ff3366;
+      --bg: #0f0007;
+      --panel: #180010;
+      --border: rgba(255,51,102,0.25);
+      --text: #f5e8ec;
+    }
+    *, *::before, *::after { box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; overflow: hidden; }
+
+    body {
+      background-image:
+        radial-gradient(ellipse 80% 80% at 50% 50%, rgba(255,51,102,0.06) 0%, transparent 65%),
+        repeating-conic-gradient(rgba(255,51,102,0.03) 0deg, transparent 1deg, transparent 5deg, rgba(255,51,102,0.03) 6deg);
+    }
+
+    #pad {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 36px;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+    #pad.active { opacity: 1; pointer-events: all; }
+
+    .slot-badge {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 13px; letter-spacing: 0.3em;
+      color: var(--accent); opacity: 0.7;
+    }
+
+    .big-label {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(44px, 12vw, 68px);
+      letter-spacing: 0.08em;
+      color: var(--accent); line-height: 1;
+      text-shadow: 0 0 40px rgba(255,51,102,0.4);
+    }
+
+    /* THE BIG BUTTON */
+    #actionBtn {
+      width: min(240px, 60vw);
+      height: min(240px, 60vw);
+      border-radius: 50%;
+      background: radial-gradient(circle at 38% 35%, #ff5580, var(--accent) 55%, #cc0033);
+      border: none;
+      cursor: pointer;
+      position: relative;
+      box-shadow:
+        0 0 0 8px rgba(255,51,102,0.1),
+        0 0 0 16px rgba(255,51,102,0.06),
+        0 8px 40px rgba(255,51,102,0.4),
+        inset 0 2px 8px rgba(255,255,255,0.2),
+        inset 0 -4px 12px rgba(0,0,0,0.3);
+      transition: transform 0.12s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.12s;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #actionBtn::before {
+      content: "";
+      position: absolute; inset: 12px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.15);
+      pointer-events: none;
+    }
+
+    #actionBtn .btn-label {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(28px, 8vw, 44px);
+      letter-spacing: 0.15em;
+      color: #fff;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      pointer-events: none;
+      display: flex; align-items: center; justify-content: center;
+      height: 100%;
+    }
+
+    #actionBtn:active,
+    #actionBtn.pressed {
+      transform: scale(0.88);
+      box-shadow:
+        0 0 0 4px rgba(255,51,102,0.15),
+        0 4px 20px rgba(255,51,102,0.6),
+        inset 0 4px 16px rgba(0,0,0,0.4);
+    }
+
+    /* Ripple ring */
+    .ripple {
+      position: absolute;
+      inset: 0; border-radius: 50%;
+      border: 3px solid var(--accent);
+      opacity: 0;
+      animation: ripple 0.6s ease-out forwards;
+      pointer-events: none;
+    }
+    @keyframes ripple {
+      0%   { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+
+    .press-count {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 20px; letter-spacing: 0.2em;
+      color: rgba(255,255,255,0.25);
+    }
+    .press-count span { color: var(--accent); font-size: 28px; }
+
+    #status { font-size: 12px; letter-spacing: 0.15em; color: rgba(255,255,255,0.3); text-transform: uppercase; }
+
+    #disconnected {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.9);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; z-index: 10; transition: opacity 0.3s;
+    }
+    #disconnected.hidden { opacity: 0; pointer-events: none; }
+    #disconnected p { color: white; font-size: 20px; font-weight: 700; margin: 0; letter-spacing: 0.1em; }
+    #disconnected button {
+      padding: 12px 32px; font-size: 14px; border: none; border-radius: 10px;
+      cursor: pointer; font-family: inherit; font-weight: 500; letter-spacing: 0.08em;
+    }
+    #reconnectBtn { background: var(--accent); color: #fff; }
+    #backBtn { background: #1a1a1a; color: #666; margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<div id="pad">
+  <div class="slot-badge">Player 3 · Slot 03</div>
+  <div class="big-label">ACTION</div>
+
+  <button id="actionBtn">
+    <div class="btn-label">FIRE</div>
+  </button>
+
+  <div class="press-count">PRESSES: <span id="pressCount">0</span></div>
+  <div id="status">Connecting…</div>
+</div>
+
+<div id="disconnected" class="hidden">
+  <p>Disconnected</p>
+  <button id="reconnectBtn">Reconnect</button>
+  <button id="backBtn">Back</button>
+</div>
+
+
+<script>
+function qs(k){ return new URLSearchParams(location.search).get(k); }
+const code         = (qs("code")||"").toUpperCase();
+const name         = qs("name")||"Player";
+const slotFromUrl  = parseInt(qs("slot")||"0");  // hint passed by join.html
+if (!code) location.href = "join.html";
+
+const slotPages = {
+  1: "controller_p1.html",
+  2: "controller_p2.html",
+  3: "controller_p3.html",
+  4: "controller_p4.html"
+};
+
+// Show expected slot immediately from URL hint (no flicker waiting for WS)
+if (slotFromUrl) {
+  const badge = document.querySelector(".slot-badge");
+  if (badge) badge.textContent = `Player ${slotFromUrl} · Slot 0${slotFromUrl}`;
+}
+
+let ws = null;
+
+const statusEl = document.getElementById("status");
+const btn      = document.getElementById("actionBtn");
+const countEl  = document.getElementById("pressCount");
+let pressCount = 0;
+function send(o){ if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(o)); }
+function fireRipple() {
+  const r = document.createElement("div"); r.className = "ripple";
+  btn.appendChild(r); r.addEventListener("animationend", () => r.remove());
+}
+btn.addEventListener("pointerdown", e => {
+  e.preventDefault(); btn.setPointerCapture(e.pointerId);
+  btn.classList.add("pressed"); pressCount++;
+  countEl.textContent = pressCount; fireRipple();
+  send({ t: "action_btn", state: "down", presses: pressCount });
+  if (navigator.vibrate) navigator.vibrate(50);
+});
+btn.addEventListener("pointerup",     e => { e.preventDefault(); btn.classList.remove("pressed"); send({ t: "action_btn", state: "up", presses: pressCount }); });
+btn.addEventListener("pointercancel", ()  => btn.classList.remove("pressed"));
+
+function connect() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${proto}://${location.host}/ws?role=client&code=${encodeURIComponent(code)}&name=${encodeURIComponent(name)}`);
+  statusEl.textContent = "Connecting…";
+
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.t === "joined") {
+      // If server assigned a different slot than expected, redirect to correct page
+      if (slotFromUrl && msg.slot !== slotFromUrl) {
+        const page = slotPages[msg.slot] || slotPages[1];
+        const p = new URLSearchParams({ code, name, slot: msg.slot });
+        location.href = page + "?" + p;
+        return;
+      }
+      const badge = document.querySelector(".slot-badge");
+      if (badge) badge.textContent = `Player ${msg.slot} · Slot 0${msg.slot}`;
+      statusEl.textContent = `Slot ${msg.slot} · ${name}`;
+      document.getElementById("pad").classList.add("active");
+      heartbeat();
+    }
+    
+  };
+
+  ws.onclose = () => {
+    statusEl.textContent = "Disconnected";
+    document.getElementById("pad").classList.remove("active");
+    document.getElementById("disconnected").classList.remove("hidden");
+  };
+}
+
+function heartbeat() {
+  if (ws?.readyState === WebSocket.OPEN) { send({ t: "ping" }); setTimeout(heartbeat, 10000); }
+}
+
+document.getElementById("reconnectBtn").onclick = () => {
+  document.getElementById("disconnected").classList.add("hidden"); connect();
+};
+document.getElementById("backBtn").onclick = () => location.href = "join.html";
+
+connect();
+</script>
+</body>
+</html>

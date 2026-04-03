@@ -1,0 +1,255 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, user-scalable=no"/>
+  <title>Player 2 · Messenger</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #00e5ff;
+      --bg: #08080f;
+      --panel: #0f0f1a;
+      --border: rgba(0,229,255,0.2);
+      --text: #e8f0f5;
+    }
+    *, *::before, *::after { box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; overflow: hidden; }
+
+    body {
+      background-image:
+        radial-gradient(ellipse 100% 60% at 50% 100%, rgba(0,229,255,0.07) 0%, transparent 70%),
+        repeating-linear-gradient(0deg, transparent, transparent 47px, rgba(0,229,255,0.04) 47px, rgba(0,229,255,0.04) 48px),
+        repeating-linear-gradient(90deg, transparent, transparent 47px, rgba(0,229,255,0.04) 47px, rgba(0,229,255,0.04) 48px);
+    }
+
+    #pad {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 28px; padding: 24px;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+    #pad.active { opacity: 1; pointer-events: all; }
+
+    .slot-badge {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 13px; letter-spacing: 0.3em;
+      color: var(--accent); opacity: 0.7;
+    }
+
+    .big-label {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(44px, 12vw, 68px);
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      line-height: 1;
+      text-shadow: 0 0 40px rgba(0,229,255,0.4);
+    }
+
+    .msg-area {
+      width: min(360px, 92vw);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Message history */
+    #history {
+      height: 120px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .msg-row {
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      color: rgba(255,255,255,0.55);
+      animation: fadeIn 0.3s ease;
+    }
+    .msg-row span { color: var(--accent); }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    #msgInput {
+      flex: 1;
+      background: var(--panel);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 15px;
+      color: var(--text);
+      outline: none;
+      font-family: inherit;
+      letter-spacing: 0.03em;
+      transition: border-color 0.2s;
+    }
+    #msgInput:focus { border-color: var(--accent); }
+    #msgInput::placeholder { color: rgba(255,255,255,0.2); }
+
+    #sendBtn {
+      padding: 0 20px;
+      background: var(--accent);
+      border: none;
+      border-radius: 10px;
+      color: #000;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px;
+      letter-spacing: 0.1em;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s;
+      white-space: nowrap;
+    }
+    #sendBtn:active { transform: scale(0.94); box-shadow: 0 0 20px rgba(0,229,255,0.5); }
+
+    #charCount {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: rgba(255,255,255,0.2);
+      text-align: right;
+    }
+
+    #status { font-size: 12px; letter-spacing: 0.15em; color: rgba(255,255,255,0.3); text-transform: uppercase; }
+
+    #disconnected {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.9);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; z-index: 10; transition: opacity 0.3s;
+    }
+    #disconnected.hidden { opacity: 0; pointer-events: none; }
+    #disconnected p { color: white; font-size: 20px; font-weight: 700; margin: 0; letter-spacing: 0.1em; }
+    #disconnected button {
+      padding: 12px 32px; font-size: 14px; border: none; border-radius: 10px;
+      cursor: pointer; font-family: inherit; font-weight: 500; letter-spacing: 0.08em;
+    }
+    #reconnectBtn { background: var(--accent); color: #000; }
+    #backBtn { background: #1a1a1a; color: #666; margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<div id="pad">
+  <div class="slot-badge">Player 2 · Slot 02</div>
+  <div class="big-label">MESSENGER</div>
+
+  <div class="msg-area">
+    <div id="history"></div>
+
+    <div class="input-row">
+      <input id="msgInput" type="text" placeholder="Type a message…" maxlength="120" autocomplete="off"/>
+      <button id="sendBtn">SEND</button>
+    </div>
+    <div id="charCount">0 / 120</div>
+  </div>
+
+  <div id="status">Connecting…</div>
+</div>
+
+<div id="disconnected" class="hidden">
+  <p>Disconnected</p>
+  <button id="reconnectBtn">Reconnect</button>
+  <button id="backBtn">Back</button>
+</div>
+
+
+<script>
+function qs(k){ return new URLSearchParams(location.search).get(k); }
+const code         = (qs("code")||"").toUpperCase();
+const name         = qs("name")||"Player";
+const slotFromUrl  = parseInt(qs("slot")||"0");  // hint passed by join.html
+if (!code) location.href = "join.html";
+
+const slotPages = {
+  1: "controller_p1.html",
+  2: "controller_p2.html",
+  3: "controller_p3.html",
+  4: "controller_p4.html"
+};
+
+// Show expected slot immediately from URL hint (no flicker waiting for WS)
+if (slotFromUrl) {
+  const badge = document.querySelector(".slot-badge");
+  if (badge) badge.textContent = `Player ${slotFromUrl} · Slot 0${slotFromUrl}`;
+}
+
+let ws = null;
+
+const statusEl  = document.getElementById("status");
+const history   = document.getElementById("history");
+const msgInput  = document.getElementById("msgInput");
+const charCount = document.getElementById("charCount");
+function send(o){ if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(o)); }
+function escHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function addHistory(text, fromName) {
+  const row = document.createElement("div");
+  row.className = "msg-row";
+  row.innerHTML = `<span>${fromName||name}</span>: ${escHtml(text)}`;
+  history.appendChild(row);
+  history.scrollTop = history.scrollHeight;
+}
+msgInput.addEventListener("input", () => { charCount.textContent = `${msgInput.value.length} / 120`; });
+function doSend() {
+  const text = msgInput.value.trim(); if (!text) return;
+  send({ t: "text_msg", text });
+  addHistory(text, "You");
+  msgInput.value = ""; charCount.textContent = "0 / 120";
+}
+document.getElementById("sendBtn").addEventListener("click", doSend);
+msgInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doSend(); } });
+
+function connect() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${proto}://${location.host}/ws?role=client&code=${encodeURIComponent(code)}&name=${encodeURIComponent(name)}`);
+  statusEl.textContent = "Connecting…";
+
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.t === "joined") {
+      // If server assigned a different slot than expected, redirect to correct page
+      if (slotFromUrl && msg.slot !== slotFromUrl) {
+        const page = slotPages[msg.slot] || slotPages[1];
+        const p = new URLSearchParams({ code, name, slot: msg.slot });
+        location.href = page + "?" + p;
+        return;
+      }
+      const badge = document.querySelector(".slot-badge");
+      if (badge) badge.textContent = `Player ${msg.slot} · Slot 0${msg.slot}`;
+      statusEl.textContent = `Slot ${msg.slot} · ${name}`;
+      document.getElementById("pad").classList.add("active");
+      heartbeat();
+    }
+    
+  };
+
+  ws.onclose = () => {
+    statusEl.textContent = "Disconnected";
+    document.getElementById("pad").classList.remove("active");
+    document.getElementById("disconnected").classList.remove("hidden");
+  };
+}
+
+function heartbeat() {
+  if (ws?.readyState === WebSocket.OPEN) { send({ t: "ping" }); setTimeout(heartbeat, 10000); }
+}
+
+document.getElementById("reconnectBtn").onclick = () => {
+  document.getElementById("disconnected").classList.add("hidden"); connect();
+};
+document.getElementById("backBtn").onclick = () => location.href = "join.html";
+
+connect();
+</script>
+</body>
+</html>

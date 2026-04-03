@@ -41,7 +41,7 @@ public class PlayerListUI : MonoBehaviour
         }
     }
 
-    void OnJoined(string id, string name)
+    void OnJoined(string id, string name, int slot)   // add  int slot
     {
         if (rows.ContainsKey(id)) return;
         var go = Instantiate(rowPrefab, contentRoot);
@@ -50,7 +50,7 @@ public class PlayerListUI : MonoBehaviour
         rows[id] = ui;
     }
 
-    void OnLeft(string id)
+    void OnLeft(string id, int slot)                  // add  int slot
     {
         if (rows.TryGetValue(id, out var ui) && ui)
         {
