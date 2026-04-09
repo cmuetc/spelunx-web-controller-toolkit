@@ -13,7 +13,7 @@ public class NodeRuntimeStarter : MonoBehaviour
 
     void Awake()
     {
-        hostClient = FindObjectOfType<HostClient>();
+        hostClient = Object.FindAnyObjectByType<HostClient>();
 #if !UNITY_EDITOR
         if(hostClient != null && !hostClient.isRemoted) StartNodeServer();
 #endif
