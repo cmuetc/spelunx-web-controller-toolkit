@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -43,7 +44,7 @@ public class LanAddressDisplay : MonoBehaviour
 
     void Render()
     {
-        string ip = GetLanIPv4();
+        string ip = GetPrimaryIPv4Address();    //GetLanIPv4();
         if(hostClient.isRemoted) ip = hostClient.relayHost;
         var code = hostClient != null ? (hostClient.RoomCode ?? "") : "";
 
@@ -58,7 +59,7 @@ public class LanAddressDisplay : MonoBehaviour
 
     }
 
-
+    [Obsolete("This method has been deprecated. Use GetPrimaryIPv4Address instead.")]
     public static string GetLanIPv4()
     {
         string localIp = "";
@@ -86,4 +87,21 @@ public class LanAddressDisplay : MonoBehaviour
 
         return localIp;
     }
+
+    /// <summary>
+    /// Get's the server's public-facing IPv4 address.
+    /// </summary>
+    /// <returns>The IPv4 address as a string</returns>
+    /// <remarks>
+    /// Gleened from https://stackoverflow.com/questions/6803073/get-local-ip-address
+    /// </remarks>
+    public static string GetPrimaryIPv4Address()
+    {
+        using Socket socket = new(AddressFamily.InterNetwork, SocketType.Dgram, 0);
+        // Connect to a common public IP (Google DNS) to trigger route selection
+        socket.Connect("8.8.8.8", 65530);
+        IPEndPoint endPoint = socket.LocalEndPoint as IPEndPoint;
+        return endPoint?.Address.ToString();
+    }
+
 }
