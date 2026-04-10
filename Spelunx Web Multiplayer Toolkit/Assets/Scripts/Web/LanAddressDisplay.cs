@@ -43,6 +43,10 @@ public class LanAddressDisplay : MonoBehaviour
         StartCoroutine(UpdateLanInfo());
     }
 
+
+    /// <summary>
+    /// Waits until the room code is available then updates the display.
+    /// </summary>
     IEnumerator UpdateLanInfo()
     {
         while (true)
@@ -50,7 +54,7 @@ public class LanAddressDisplay : MonoBehaviour
             // Wait until the host client has a room code before updating the display
             if (hostClient == null || String.IsNullOrEmpty(hostClient.RoomCode))
             {
-                yield return new WaitForSeconds(0.5f);
+                yield return new WaitForSeconds(1.0f);
             }
 
             // Update the cached values
@@ -91,63 +95,6 @@ public class LanAddressDisplay : MonoBehaviour
     }
 
 
-    void showRoomCode()
-    {
-        if (roomCodeText != null && hostClient != null)
-        {
-            roomCodeText.text = "Room Code: " + hostClient.RoomCode;
-        }
-    }
-
-    void Render()
-    {
-        string ip = GetPrimaryIPv4Address();
-        if (hostClient.isRemoted) ip = hostClient.relayHost;
-        var code = hostClient != null ? (hostClient.RoomCode ?? "") : "";
-
-        if (ip == "")
-        {
-            ipText.text = "No LAN IPv4 found. Is Wi-Fi/Ethernet connected?";
-        }
-        else
-        {   
-            string server_url = $"http://{ip}:{relayPort}{controllerPath}";
-            ipText.text = server_url;
-            Texture2D qrcode = GenerateQRCode($"{server_url}?code={code}");
-            QRCodeImage.texture = qrcode;
-        }
-        
-    }
-
-    [Obsolete("This method has been deprecated. Use GetPrimaryIPv4Address instead.")]
-    public static string GetLanIPv4()
-    {
-        string localIp = "";
-        foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
-        {
-            if (ni.OperationalStatus != OperationalStatus.Up) continue;
-
-            // Prefer typical physical adapters:
-            if (ni.NetworkInterfaceType != NetworkInterfaceType.Wireless80211 &&
-                ni.NetworkInterfaceType != NetworkInterfaceType.Ethernet)
-                continue;
-
-            var ipProps = ni.GetIPProperties();
-            foreach (var ua in ipProps.UnicastAddresses)
-            {
-                if (ua.Address.AddressFamily != AddressFamily.InterNetwork) continue; // IPv4 only
-                var ip = ua.Address;
-                if (IPAddress.IsLoopback(ip)) continue;
-
-                var b = ip.GetAddressBytes();
-                if (b.Length == 4 && b[0] == 169 && b[1] == 254) continue; // skip APIPA 169.254.x.x
-                localIp += ip.ToString();
-            }
-        }
-
-        return localIp;
-    }
-
     /// <summary>
     /// Get's the server's public-facing IPv4 address.
     /// </summary>
@@ -164,6 +111,14 @@ public class LanAddressDisplay : MonoBehaviour
         return endPoint?.Address.ToString();
     }
 
+
+    /// <summary>
+    /// Generates a QR code texture from the given text using the ZXing library.
+    /// </summary>
+    /// <param name="text">The text to encode in the QR code.</param>
+    /// <param name="width">The width of the generated QR code texture.</param>
+    /// <param name="height">The height of the generated QR code texture.</param>
+    /// <returns>A Texture2D containing the generated QR code.</returns>
     public static Texture2D GenerateQRCode(string text, int width = 256, int height = 256)
     {
         var qrcode = new Texture2D(width, height);
