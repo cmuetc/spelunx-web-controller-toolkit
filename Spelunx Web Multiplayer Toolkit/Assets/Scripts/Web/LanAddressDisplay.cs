@@ -1,51 +1,108 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using Mono.Cecil.Cil;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
+using ZXing;
+using ZXing.QrCode;
 
 public class LanAddressDisplay : MonoBehaviour
 {
     [Header("UI Settings")]
     public TextMeshProUGUI ipText;
     public TextMeshProUGUI roomCodeText;
+
     [Header("QR Code for IP(Optional and you have to provide your own QR code. The script will not generate one for you)")]
-    public GameObject QRCodeImage;
+    public RawImage QRCodeImage;
 
     [Header("Relay info")]
     public string controllerPath = "/controller.html";
-    private int relayPort;
 
     [Header("HostClient")]
     public HostClient hostClient;
 
+    // Cached values for optimization
+    private string ipAddress;
+    private string roomCode;
+    private int relayPort;
 
     void Start()
     {
-        relayPort = hostClient.relayPort;
-        showRoomCode();
-        if(!QRCodeImage) Render();
+        //relayPort = hostClient.relayPort;
+        //showRoomCode();
+        //if (!QRCodeImage) Render();
 
         // Update the displayed LAN IPs and room code every 0.5 seconds (Important delay for the host to get the room code from the relay)
-        InvokeRepeating(nameof(showRoomCode), 0.5f, 0.5f);
+        //InvokeRepeating(nameof(showRoomCode), 0.5f, 0.5f);
+        StartCoroutine(UpdateLanInfo());
     }
+
+    IEnumerator UpdateLanInfo()
+    {
+        while (true)
+        {
+            // Wait until the host client has a room code before updating the display
+            if (hostClient == null || String.IsNullOrEmpty(hostClient.RoomCode))
+            {
+                yield return new WaitForSeconds(0.5f);
+            }
+
+            // Update the cached values
+            ipAddress = GetPrimaryIPv4Address();
+            roomCode = hostClient.RoomCode;
+            relayPort = hostClient.relayPort;
+
+            // Update the server URL and QR code
+            if (String.IsNullOrEmpty(ipAddress))
+            {
+                ipText.text = "No LAN IPv4 found. Is Wi-Fi/Ethernet connected?";
+            }
+            else
+            {
+                string server_url = $"http://{ipAddress}:{relayPort}{controllerPath}";
+                if (ipText != null)
+                {
+                    ipText.text = server_url;
+                }
+
+                if (QRCodeImage != null)
+                {
+                    Texture2D qrcode = GenerateQRCode($"{server_url}?code={roomCode}");
+                    QRCodeImage.texture = qrcode;
+                }
+            }
+
+
+            // Update the displayed LAN IPs and room code
+            if (roomCodeText != null)
+            {
+                roomCodeText.text = $"Room Code: {roomCode}";
+            }
+
+            // Exit coroutine
+            yield break;
+        }
+    }
+
 
     void showRoomCode()
     {
         if (roomCodeText != null && hostClient != null)
         {
-
             roomCodeText.text = "Room Code: " + hostClient.RoomCode;
         }
     }
 
     void Render()
     {
-        string ip = GetPrimaryIPv4Address();    //GetLanIPv4();
-        if(hostClient.isRemoted) ip = hostClient.relayHost;
+        string ip = GetPrimaryIPv4Address();
+        if (hostClient.isRemoted) ip = hostClient.relayHost;
         var code = hostClient != null ? (hostClient.RoomCode ?? "") : "";
 
         if (ip == "")
@@ -53,10 +110,13 @@ public class LanAddressDisplay : MonoBehaviour
             ipText.text = "No LAN IPv4 found. Is Wi-Fi/Ethernet connected?";
         }
         else
-        {
-            ipText.text = $"{ip}:{relayPort}{controllerPath}\n";
+        {   
+            string server_url = $"http://{ip}:{relayPort}{controllerPath}";
+            ipText.text = server_url;
+            Texture2D qrcode = GenerateQRCode($"{server_url}?code={code}");
+            QRCodeImage.texture = qrcode;
         }
-
+        
     }
 
     [Obsolete("This method has been deprecated. Use GetPrimaryIPv4Address instead.")]
@@ -104,4 +164,24 @@ public class LanAddressDisplay : MonoBehaviour
         return endPoint?.Address.ToString();
     }
 
+    public static Texture2D GenerateQRCode(string text, int width = 256, int height = 256)
+    {
+        var qrcode = new Texture2D(width, height);
+
+        var writer = new BarcodeWriter
+        {
+            Format = BarcodeFormat.QR_CODE,
+            Options = new QrCodeEncodingOptions
+            {
+                Width = width,
+                Height = height
+            }
+        };
+
+        var color32 = writer.Write(text);
+        qrcode.SetPixels32(color32);
+        qrcode.Apply();
+
+        return qrcode;
+    }
 }

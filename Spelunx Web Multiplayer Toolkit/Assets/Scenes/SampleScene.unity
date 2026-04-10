@@ -119,6 +119,17 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!114 &38350134 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8946224984622413673, guid: 33be52beab6f62045b1608a1c4ef3ff9, type: 3}
+  m_PrefabInstance: {fileID: 5721396602887921352}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1344c3c82d62a2a41a3576d8abb8e3ea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &107990461
 GameObject:
   m_ObjectHideFlags: 0
@@ -655,10 +666,34 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1205419711735191186, guid: 33be52beab6f62045b1608a1c4ef3ff9, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 256
+      objectReference: {fileID: 0}
+    - target: {fileID: 1205419711735191186, guid: 33be52beab6f62045b1608a1c4ef3ff9, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 256
+      objectReference: {fileID: 0}
+    - target: {fileID: 1205419711735191186, guid: 33be52beab6f62045b1608a1c4ef3ff9, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: -1050
+      objectReference: {fileID: 0}
+    - target: {fileID: 1205419711735191186, guid: 33be52beab6f62045b1608a1c4ef3ff9, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 369
+      objectReference: {fileID: 0}
     - target: {fileID: 3392208029526792114, guid: 33be52beab6f62045b1608a1c4ef3ff9, type: 3}
       propertyPath: hostClient
       value: 
       objectReference: {fileID: 6626170342571121676}
+    - target: {fileID: 3392208029526792114, guid: 33be52beab6f62045b1608a1c4ef3ff9, type: 3}
+      propertyPath: QRCodeImage
+      value: 
+      objectReference: {fileID: 38350134}
+    - target: {fileID: 3392208029526792114, guid: 33be52beab6f62045b1608a1c4ef3ff9, type: 3}
+      propertyPath: justBecause
+      value: 
+      objectReference: {fileID: 38350134}
     - target: {fileID: 3392208029526792114, guid: 33be52beab6f62045b1608a1c4ef3ff9, type: 3}
       propertyPath: controllerPath
       value: /join.html
@@ -815,12 +850,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1a8557560ab26d74b80db70fb67a6e1c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  hostClient: {fileID: 6626170342571121676}
-  playerPrefab: {fileID: 0}
-  spawnPoints:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
