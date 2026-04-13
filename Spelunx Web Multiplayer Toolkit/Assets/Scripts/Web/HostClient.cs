@@ -43,6 +43,7 @@ public class PlayerInputState
     // ---- Slot 2: Messenger ----
     public string lastMessage;          // most recent text sent
     public bool   newMessage;           // true for one frame after a message arrives
+    [NonSerialized] public bool _newMessagePending;
     [NonSerialized] public string _prevMessage;
 
     // ---- Slot 3: Action button ----
@@ -139,6 +140,9 @@ public class HostClient : MonoBehaviour
 
         foreach (var p in Players.Values)
         {
+            // p2 message
+            p.newMessage         = p._newMessagePending;
+            p._newMessagePending = false;
             // Jump / legacy
             p.jumpPressed  = p.jump && !p._prevJump;
             p.jumpReleased = !p.jump && p._prevJump;
@@ -161,7 +165,6 @@ public class HostClient : MonoBehaviour
         foreach (var p in Players.Values)
         {
             p.sliderChanged = false;
-            p.newMessage    = false;
         }
     }
 
@@ -230,10 +233,13 @@ public class HostClient : MonoBehaviour
             {
                 if (!Players.TryGetValue(msg.id, out var player)) break;
                 player.lastMessage = msg.text;
-                player.newMessage  = true;
+                player._newMessagePending = true;
                 Debug.Log($"[HostClient] MSG from {player.playerName}: {msg.text}");
                 router?.OnTextMessage(msg.id, msg.text);
                 MessageEvent?.Invoke(player, msg.text);
+
+                // Example: forward this text to slot 4's display 
+                SendTextToDisplay(msg.text, player.playerName);
                 break;
             }
 

@@ -82,7 +82,7 @@ public class PlayerInputRouter : MonoBehaviour
         var p3 = hostClient.GetSlot(3);
         if (p3 != null)
         {
-            if (p3.actionPressed)
+            if (p3.actionDown)
                 Debug.Log($"{p3.playerName} fired! (press #{p3.totalPresses})");
             // p3.actionDown → held state
         }

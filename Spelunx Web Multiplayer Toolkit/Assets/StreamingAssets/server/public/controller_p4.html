@@ -226,6 +226,7 @@ function connect() {
     }
     
     if (msg.t === "incoming_text") { addMessage(msg.text, msg.from||"Player 2"); }
+    if (msg.t === "slot_message"  && msg.payload?.text) { addMessage(msg.payload.text, msg.payload.from||"Host"); }
     if (msg.t === "host_broadcast" && msg.payload?.text) { addMessage(msg.payload.text, msg.payload.from||"Host"); }
 
   };
