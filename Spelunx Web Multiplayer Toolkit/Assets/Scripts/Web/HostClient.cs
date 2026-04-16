@@ -1,74 +1,48 @@
 using System;
-using System.Text;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 using NativeWebSocket;
 
-// -------------------------------------------------------
-// Message envelope — matches every JSON shape the server sends
-// -------------------------------------------------------
-[Serializable]
-public class MsgBase
-{
-    public string t;        // message type
-    public string code;     // room code
-    public string id;       // player id
-    public string name;     // player name
-    public string team;     // "red" | "blue" | "green" (legacy)
-    public int    slot;     // 1 | 2 | 3 | 4  — join order
-    public string btn;      // "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight" | "Jump"
-    public string state;    // "down" | "hold" | "up"
-    public string reason;   // error reason
-    public float  value;    // slider value (0–100)
-    public string text;     // text message (slot 2)
-    public int    presses;  // cumulative press count (slot 3)
-}
-
-// -------------------------------------------------------
-// Per-player input state — read this from PlayerInputRouter
-// -------------------------------------------------------
-[Serializable]
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-player input state
+// ─────────────────────────────────────────────────────────────────────────────
 public class PlayerInputState
 {
     public string playerId;
     public string playerName;
-    public int    slot;         // 1 = slider, 2 = messenger, 3 = action btn, 4 = display
+    public int    slot;
 
-    // ---- Slot 1: Slider ----
-    public float sliderValue;           // 0.0 – 100.0, normalised to 0–1 via SliderNormalized
+    // Slot 1 — Slider
+    public float sliderValue;
     public float SliderNormalized => sliderValue / 100f;
-    public bool  sliderChanged;         // true for one frame after slider moves
+    public bool  sliderChanged;
 
-    // ---- Slot 2: Messenger ----
-    public string lastMessage;          // most recent text sent
-    public bool   newMessage;           // true for one frame after a message arrives
-    [NonSerialized] public bool _newMessagePending;
-    [NonSerialized] public string _prevMessage;
+    // Slot 2 — Messenger
+    public string lastMessage;
+    public bool   newMessage;
+    public bool   _newMessagePending;
 
-    // ---- Slot 3: Action button ----
-    public bool   actionDown;           // held state
-    public bool   actionPressed;        // true for one frame (leading edge)
-    public bool   actionReleased;       // true for one frame (trailing edge)
-    public int    totalPresses;         // cumulative count
-    [NonSerialized] public bool _prevAction;
+    // Slot 3 — Action button
+    public bool actionDown;
+    public bool actionPressed;
+    public bool actionReleased;
+    public int  totalPresses;
+    public bool _prevAction;
 
-    // ---- Legacy d-pad (slot 1 fallback / original controllers) ----
+    // Legacy d-pad
     public bool up, down, left, right, jump;
     public bool jumpPressed, jumpReleased;
-    [NonSerialized] public bool _prevJump;
+    public bool _prevJump;
 
     public Vector2 DirectionVector =>
         new Vector2((right ? 1f : 0f) - (left ? 1f : 0f),
                     (up    ? 1f : 0f) - (down ? 1f : 0f));
-
-    public override string ToString() =>
-        $"[P{slot}/{playerName}] slider={sliderValue:F0} msg={lastMessage} action={actionDown}";
 }
 
-// -------------------------------------------------------
-// HostClient
-// -------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// HostClient  — messages are pipe-delimited strings, e.g. "slider|id|slot|73.5"
+// ─────────────────────────────────────────────────────────────────────────────
 public class HostClient : MonoBehaviour
 {
     [Header("Relay")]
@@ -77,33 +51,30 @@ public class HostClient : MonoBehaviour
     public bool   useSecure = false;
     public bool   isRemoted = false;
 
-    // ---- Public state ----
-    public string RoomCode { get; private set; }
+    public string RoomCode      { get; private set; }
+    public string Phase         { get; private set; } = "waiting";
+    public bool   IsGameStarted => Phase == "game";
+    public int    QueueCount    { get; private set; }
 
-    /// All connected players, keyed by server-assigned id
     public readonly Dictionary<string, PlayerInputState> Players = new();
+    public readonly Dictionary<int,    PlayerInputState> Slots   = new();
+    public readonly Dictionary<string, string>           players = new();
 
-    /// Quick slot lookup  —  slot 1-4 → PlayerInputState (null if not connected)
-    public readonly Dictionary<int, PlayerInputState> Slots = new();
+    public event Action<string, string>                   PlayerQueued;
+    public event Action<string, string, int>              PlayerJoined;
+    public event Action<string, int>                      PlayerLeft;
+    public event Action<PlayerInputState, float>          SliderEvent;
+    public event Action<PlayerInputState, string>         MessageEvent;
+    public event Action<PlayerInputState, string>         ActionEvent;
+    public event Action<PlayerInputState, string, string> ButtonEvent;
+    public event Action                                   GameStarted;
 
-    /// Legacy name lookup
-    public readonly Dictionary<string, string> players = new();
-
-    // ---- Events ----
-    public event Action<string, string, int>          PlayerJoined;   // (id, name, slot)
-    public event Action<string, int>                  PlayerLeft;     // (id, slot)
-    public event Action<PlayerInputState, string, string> ButtonEvent; // (player, btn, state)
-    public event Action<PlayerInputState, float>      SliderEvent;    // (player, value)
-    public event Action<PlayerInputState, string>     MessageEvent;   // (player, text)
-    public event Action<PlayerInputState, string>     ActionEvent;    // (player, state "down"|"up")
-
-    // ---- Inspector hooks ----
     public PlayerInputRouter router;
 
-    // ---- Internal ----
     WebSocket _ws;
 
-    // ============================================================
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
     async void Start()
     {
         if (!isRemoted) relayHost = "localhost";
@@ -113,153 +84,177 @@ public class HostClient : MonoBehaviour
     async Task Connect()
     {
         string scheme = useSecure ? "wss" : "ws";
-        string url    = $"{scheme}://{relayHost}:{relayPort}/ws?role=host";
+        _ws = new WebSocket($"{scheme}://{relayHost}:{relayPort}/ws?role=host");
 
-        _ws = new WebSocket(url);
-
-        _ws.OnOpen  += ()  => Debug.Log("[HostClient] Connected to relay.");
-        _ws.OnError += (e) => Debug.LogError("[HostClient] WS Error: " + e);
-        _ws.OnClose += (c) => Debug.LogWarning("[HostClient] WS closed: " + c);
-
-        _ws.OnMessage += (bytes) =>
-        {
-            string json = Encoding.UTF8.GetString(bytes);
-            var msg = JsonUtility.FromJson<MsgBase>(json);
-            HandleMessage(msg);
-        };
+        _ws.OnOpen    += ()  => Debug.Log("[HostClient] Connected.");
+        _ws.OnError   += e   => Debug.LogError("[HostClient] Error: " + e);
+        _ws.OnClose   += c   => Debug.LogWarning("[HostClient] Closed: " + c);
+        _ws.OnMessage += bytes => Handle(System.Text.Encoding.UTF8.GetString(bytes));
 
         await _ws.Connect();
     }
 
-    // ============================================================
     void Update()
     {
 #if !UNITY_WEBGL || UNITY_EDITOR
         _ws?.DispatchMessageQueue();
 #endif
-
         foreach (var p in Players.Values)
         {
-            // p2 message
             p.newMessage         = p._newMessagePending;
             p._newMessagePending = false;
-            // Jump / legacy
-            p.jumpPressed  = p.jump && !p._prevJump;
-            p.jumpReleased = !p.jump && p._prevJump;
-            p._prevJump    = p.jump;
 
-            // Action button edge detection
-            p.actionPressed  = p.actionDown && !p._prevAction;
+            p.actionPressed  = p.actionDown  && !p._prevAction;
             p.actionReleased = !p.actionDown && p._prevAction;
-            p._prevAction    = p.actionDown;
-
-            // Slider changed flag — cleared each frame after being set by HandleMessage
-            // (already set in HandleMessage; we clear it here after one frame)
-            // newMessage similarly
+            p.jumpPressed    = p.jump        && !p._prevJump;
+            p.jumpReleased   = !p.jump       && p._prevJump;
         }
     }
 
     void LateUpdate()
     {
-        // Clear single-frame flags after they've been readable for one full Update()
         foreach (var p in Players.Values)
         {
+            p._prevAction   = p.actionDown;
+            p._prevJump     = p.jump;
             p.sliderChanged = false;
         }
     }
 
-    // ============================================================
-    void HandleMessage(MsgBase msg)
+    // ── Message handler ───────────────────────────────────────────────────────
+    // All messages: "type|field1|field2|..."
+
+    void Handle(string raw)
     {
-        switch (msg.t)
+        // Split only up to needed parts; use max 8 splits for text_msg content safety
+        string[] p = raw.Split('|', 8);
+        string   t = p[0];
+
+        switch (t)
         {
-            // ---- Room ready ----
+            // room_created|CODE
             case "room_created":
-                RoomCode = msg.code;
+                RoomCode = p[1];
                 Debug.Log("[HostClient] Room: " + RoomCode);
                 break;
 
-            // ---- Player joined ----
-            case "player_joined":
+            // player_queued|id|name
+            case "player_queued":
             {
-                var state = new PlayerInputState
-                {
-                    playerId   = msg.id,
-                    playerName = msg.name,
-                    slot       = msg.slot
-                };
-
-                Players[msg.id] = state;
-                Slots[msg.slot] = state;
-                players[msg.id] = msg.name;
-
-                Debug.Log($"[HostClient] JOIN id={msg.id} name={msg.name} slot={msg.slot}");
-
-                router?.OnPlayerJoined(msg.id, msg.name, msg.slot);
-                PlayerJoined?.Invoke(msg.id, msg.name, msg.slot);
+                string id = p[1], name = p[2];
+                QueueCount++;
+                Debug.Log($"[HostClient] QUEUED {name}");
+                router?.OnPlayerQueued(id, name);
+                PlayerQueued?.Invoke(id, name);
                 break;
             }
 
-            // ---- Player left ----
+            // player_left_queue|id|name
+            case "player_left_queue":
+                QueueCount = Mathf.Max(0, QueueCount - 1);
+                router?.OnPlayerLeftQueue(p[1], p[2]);
+                break;
+
+            // waiting_state|count
+            case "waiting_state":
+                // Informational — router can override OnWaitingState if needed
+                break;
+
+            // game_start|id1|name1|slot1|id2|name2|slot2|...
+            case "game_start":
+            {
+                Phase = "game";
+                // Parse triplets starting at index 1
+                for (int i = 1; i + 2 < p.Length; i += 3)
+                {
+                    string id   = p[i];
+                    string name = p[i + 1];
+                    int    slot = int.TryParse(p[i + 2], out int s) ? s : 0;
+                    if (slot == 0) break;
+
+                    var state = new PlayerInputState
+                        { playerId = id, playerName = name, slot = slot };
+                    Players[id] = state;
+                    Slots[slot] = state;
+                    players[id] = name;
+
+                    Debug.Log($"[HostClient] ASSIGNED P{slot} = {name}");
+                    router?.OnPlayerJoined(id, name, slot);
+                    PlayerJoined?.Invoke(id, name, slot);
+                }
+                Debug.Log("[HostClient] Game started!");
+                router?.OnGameStart();
+                GameStarted?.Invoke();
+                break;
+            }
+
+            // player_left|id
             case "player_left":
             {
-                if (Players.TryGetValue(msg.id, out var state))
+                string id = p[1];
+                if (Players.TryGetValue(id, out var state))
                 {
                     Slots.Remove(state.slot);
-                    Players.Remove(msg.id);
-                    players.Remove(msg.id);
-
-                    Debug.Log($"[HostClient] LEFT id={msg.id} slot={state.slot}");
-
-                    router?.OnPlayerLeft(msg.id, state.slot);
-                    PlayerLeft?.Invoke(msg.id, state.slot);
+                    Players.Remove(id);
+                    players.Remove(id);
+                    Debug.Log($"[HostClient] LEFT P{state.slot} {state.playerName}");
+                    router?.OnPlayerLeft(id, state.slot);
+                    PlayerLeft?.Invoke(id, state.slot);
                 }
                 break;
             }
 
-            // ---- Slot 1: Slider ----
+            // slider|id|slot|value
             case "slider":
             {
-                if (!Players.TryGetValue(msg.id, out var player)) break;
-                player.sliderValue  = msg.value;
+                string id = p[1];
+                float val = float.TryParse(p[3], System.Globalization.NumberStyles.Float,
+                                System.Globalization.CultureInfo.InvariantCulture, out float f) ? f : 0f;
+                if (!Players.TryGetValue(id, out var player)) break;
+                player.sliderValue   = val;
                 player.sliderChanged = true;
-                router?.OnSliderInput(msg.id, msg.value);
-                SliderEvent?.Invoke(player, msg.value);
+                router?.OnSliderInput(id, val);
+                SliderEvent?.Invoke(player, val);
                 break;
             }
 
-            // ---- Slot 2: Text message ----
+            // text_msg|id|slot|text...
             case "text_msg":
             {
-                if (!Players.TryGetValue(msg.id, out var player)) break;
-                player.lastMessage = msg.text;
+                string id   = p[1];
+                string text = p.Length > 3 ? p[3] : "";
+                if (!Players.TryGetValue(id, out var player)) break;
+                player.lastMessage        = text;
                 player._newMessagePending = true;
-                Debug.Log($"[HostClient] MSG from {player.playerName}: {msg.text}");
-                router?.OnTextMessage(msg.id, msg.text);
-                MessageEvent?.Invoke(player, msg.text);
-
-                // Example: forward this text to slot 4's display 
-                SendTextToDisplay(msg.text, player.playerName);
+                Debug.Log($"[HostClient] MSG {player.playerName}: {text}");
+                router?.OnTextMessage(id, text);
+                MessageEvent?.Invoke(player, text);
                 break;
             }
 
-            // ---- Slot 3: Action button ----
+            // action_btn|id|slot|state|presses
             case "action_btn":
             {
-                if (!Players.TryGetValue(msg.id, out var player)) break;
-                player.actionDown   = msg.state == "down";
-                player.totalPresses = msg.presses;
-                router?.OnActionButton(msg.id, msg.state, msg.presses);
-                ActionEvent?.Invoke(player, msg.state);
+                string id     = p[1];
+                string state  = p[3];
+                int presses   = int.TryParse(p[4], out int pr) ? pr : 0;
+                if (!Players.TryGetValue(id, out var player)) break;
+                player.actionDown   = state == "down";
+                player.totalPresses = presses;
+                router?.OnActionButton(id, state, presses);
+                ActionEvent?.Invoke(player, state);
                 break;
             }
 
-            // ---- Legacy btn input ----
+            // btn|id|slot|btn|state
             case "btn":
             {
-                if (!Players.TryGetValue(msg.id, out var player)) break;
-                bool held = msg.state == "down" || msg.state == "hold";
-                switch (msg.btn)
+                string id    = p[1];
+                string btn   = p[3];
+                string state = p[4];
+                if (!Players.TryGetValue(id, out var player)) break;
+                bool held = state == "down" || state == "hold";
+                switch (btn)
                 {
                     case "ArrowUp":    player.up    = held; break;
                     case "ArrowDown":  player.down  = held; break;
@@ -267,41 +262,35 @@ public class HostClient : MonoBehaviour
                     case "ArrowRight": player.right = held; break;
                     case "Jump":       player.jump  = held; break;
                 }
-                router?.OnButtonInput(msg.id, msg.btn, msg.state);
-                ButtonEvent?.Invoke(player, msg.btn, msg.state);
+                router?.OnButtonInput(id, btn, state);
+                ButtonEvent?.Invoke(player, btn, state);
                 break;
             }
 
+            // error|reason
             case "error":
-                Debug.LogError("[HostClient] Relay error: " + msg.reason);
+                Debug.LogError("[HostClient] Server error: " + (p.Length > 1 ? p[1] : ""));
                 break;
         }
     }
 
-    // ============================================================
-    // Convenience: get player by slot
+    // ── Public API ────────────────────────────────────────────────────────────
+
     public PlayerInputState GetSlot(int slot) =>
         Slots.TryGetValue(slot, out var p) ? p : null;
 
-    // Send text to slot 4's display
-    public async void SendTextToDisplay(string text, string from = "Host")
+    async void Send(string msg)
     {
-        if (_ws == null || _ws.State != WebSocketState.Open) return;
-        var payload = $"{{\"text\":\"{EscapeJson(text)}\",\"from\":\"{EscapeJson(from)}\"}}";
-        var msg     = $"{{\"t\":\"send_to_slot\",\"slot\":4,\"payload\":{payload}}}";
-        await _ws.SendText(msg);
+        if (_ws?.State == WebSocketState.Open) await _ws.SendText(msg);
     }
 
-    // Broadcast a raw payload to all clients
-    public async void BroadcastToClients(object payload)
-    {
-        if (_ws == null || _ws.State != WebSocketState.Open) return;
-        var wrapper = $"{{\"t\":\"broadcast_to_clients\",\"payload\":{JsonUtility.ToJson(payload)}}}";
-        await _ws.SendText(wrapper);
-    }
+    public void AssignAndStart()      => Send("assign_slots");
 
-    static string EscapeJson(string s) =>
-        s?.Replace("\\", "\\\\").Replace("\"", "\\\"") ?? "";
+    public void SendTextToDisplay(string text, string from = "Host")
+        => Send($"send_to_slot|4|{text}|{from}");
 
-    private void OnApplicationQuit() => _ws?.Close();
+    public void BroadcastToClients(string payload)
+        => Send($"broadcast_to_clients|{payload}");
+
+    void OnApplicationQuit() => _ws?.Close();
 }

@@ -180,7 +180,8 @@ const statusEl = document.getElementById("status");
 const btn      = document.getElementById("actionBtn");
 const countEl  = document.getElementById("pressCount");
 let pressCount = 0;
-function send(o){ if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(o)); }
+function send(...parts){ if(ws && ws.readyState === WebSocket.OPEN) ws.send(parts.join("|")); }
+function parse(raw){ return raw.split("|"); }
 function fireRipple() {
   const r = document.createElement("div"); r.className = "ripple";
   btn.appendChild(r); r.addEventListener("animationend", () => r.remove());
@@ -189,10 +190,10 @@ btn.addEventListener("pointerdown", e => {
   e.preventDefault(); btn.setPointerCapture(e.pointerId);
   btn.classList.add("pressed"); pressCount++;
   countEl.textContent = pressCount; fireRipple();
-  send({ t: "action_btn", state: "down", presses: pressCount });
+  send("action_btn","down",pressCount);
   if (navigator.vibrate) navigator.vibrate(50);
 });
-btn.addEventListener("pointerup",     e => { e.preventDefault(); btn.classList.remove("pressed"); send({ t: "action_btn", state: "up", presses: pressCount }); });
+btn.addEventListener("pointerup",     e => { e.preventDefault(); btn.classList.remove("pressed"); send("action_btn","up",pressCount); });
 btn.addEventListener("pointercancel", ()  => btn.classList.remove("pressed"));
 
 function connect() {
@@ -201,18 +202,19 @@ function connect() {
   statusEl.textContent = "Connecting…";
 
   ws.onmessage = e => {
-    const msg = JSON.parse(e.data);
-    if (msg.t === "joined") {
+    const [t,...a] = parse(e.data);
+    if (t === "joined") {
       // If server assigned a different slot than expected, redirect to correct page
-      if (slotFromUrl && msg.slot !== slotFromUrl) {
-        const page = slotPages[msg.slot] || slotPages[1];
-        const p = new URLSearchParams({ code, name, slot: msg.slot });
+      if (slotFromUrl && joinedSlot !== slotFromUrl) {
+        const page = slotPages[joinedSlot] || slotPages[1];
+        const p = new URLSearchParams({ code, name, slot: joinedSlot });
         location.href = page + "?" + p;
         return;
       }
       const badge = document.querySelector(".slot-badge");
-      if (badge) badge.textContent = `Player ${msg.slot} · Slot 0${msg.slot}`;
-      statusEl.textContent = `Slot ${msg.slot} · ${name}`;
+      if (badge) badge.textContent = `Player ${joinedSlot} · Slot 0${joinedSlot}`;
+      const joinedSlot=parseInt(a[3]||"0");
+      statusEl.textContent = `Slot ${joinedSlot} · ${name}`;
       document.getElementById("pad").classList.add("active");
       heartbeat();
     }
@@ -227,7 +229,7 @@ function connect() {
 }
 
 function heartbeat() {
-  if (ws?.readyState === WebSocket.OPEN) { send({ t: "ping" }); setTimeout(heartbeat, 10000); }
+  if (ws?.readyState === WebSocket.OPEN) { send("ping"); setTimeout(heartbeat, 10000); }
 }
 
 document.getElementById("reconnectBtn").onclick = () => {

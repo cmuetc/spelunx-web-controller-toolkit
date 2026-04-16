@@ -146,48 +146,12 @@ function doJoin() {
   document.getElementById("joinBtn").disabled = true;
   document.getElementById("connecting").classList.add("show");
 
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  // ── Single connection.  The server assigns the slot and sends it back.
-  // We immediately redirect, passing code+name so the controller page
-  // opens its OWN persistent connection using the same credentials.
-  // No second "probe" connection — the join.html WS is closed right after redirect.
-  const ws = new WebSocket(`${proto}://${location.host}/ws?role=client&code=${encodeURIComponent(code)}&name=${encodeURIComponent(name)}`);
-
-  let done = false;
-
-  ws.onmessage = e => {
-    if (done) return;
-    const msg = JSON.parse(e.data);
-
-    if (msg.t === "joined") {
-      done = true;
-      // Close join.html's connection — the controller page will open a fresh one
-      // with the same name and will reclaim the same slot (reserved by name).
-      ws.close();
-      const slot = msg.slot;
-      document.getElementById("connectMsg").textContent = `You are Player ${slot}!`;
-      setTimeout(() => {
-        const params = new URLSearchParams({ code, name, slot });
-        location.href = (slotPages[slot] || slotPages[1]) + "?" + params;
-      }, 500);
-    }
-
-    if (msg.t === "error") {
-      done = true;
-      ws.close();
-      document.getElementById("connecting").classList.remove("show");
-      document.getElementById("joinBtn").disabled = false;
-      st.textContent = msg.reason || "Could not join.";
-    }
-  };
-
-  ws.onerror = () => {
-    if (done) return;
-    done = true;
-    document.getElementById("connecting").classList.remove("show");
-    document.getElementById("joinBtn").disabled = false;
-    st.textContent = "Connection failed. Check the room code.";
-  };
+  // Redirect straight to waiting.html — it opens the real persistent WS.
+  // No probe connection needed; waiting.html shows the error if room not found.
+  document.getElementById("connectMsg").textContent = "Joining…";
+  setTimeout(() => {
+    location.href = "waiting.html?" + new URLSearchParams({ code, name });
+  }, 200);
 }
 
 // Auto-fill from QR-code URL

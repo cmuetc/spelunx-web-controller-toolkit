@@ -1,0 +1,286 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, user-scalable=no"/>
+  <title>Waiting…</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #ff4400;
+      --bg: #080808;
+      --panel: #111;
+      --text: #f0ece4;
+      --muted: rgba(255,255,255,0.3);
+    }
+    *, *::before, *::after { box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; overflow: hidden; }
+
+    body {
+      background-image:
+        radial-gradient(ellipse 70% 50% at 50% 100%, rgba(255,68,0,0.09) 0%, transparent 60%),
+        repeating-linear-gradient(0deg, transparent, transparent 47px, rgba(255,255,255,0.02) 47px, rgba(255,255,255,0.02) 48px),
+        repeating-linear-gradient(90deg, transparent, transparent 47px, rgba(255,255,255,0.02) 47px, rgba(255,255,255,0.02) 48px);
+    }
+
+    #screen {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 32px; padding: 32px;
+    }
+
+    /* ── spinner ── */
+    .spinner-wrap { position: relative; width: 96px; height: 96px; }
+
+    .spinner {
+      width: 96px; height: 96px;
+      border: 3px solid rgba(255,255,255,0.06);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .spinner-inner {
+      position: absolute; inset: 12px;
+      border: 2px solid rgba(255,255,255,0.04);
+      border-bottom-color: rgba(255,68,0,0.4);
+      border-radius: 50%;
+      animation: spin 1.5s linear infinite reverse;
+    }
+
+    /* ── text ── */
+    .waiting-label {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(22px, 6vw, 30px);
+      letter-spacing: 0.15em;
+      color: rgba(255,255,255,0.7);
+      text-align: center;
+    }
+
+    /* ── player count ── */
+    .count-wrap {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 12px;
+    }
+
+    .count-pips {
+      display: flex; gap: 10px;
+    }
+
+    .pip {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      border: 1.5px solid rgba(255,255,255,0.12);
+      transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+    }
+    .pip.filled {
+      background: var(--accent);
+      border-color: rgba(255,100,40,0.6);
+      box-shadow: 0 0 10px rgba(255,68,0,0.5);
+    }
+
+    .count-text {
+      font-size: 13px; letter-spacing: 0.15em;
+      color: var(--muted); text-transform: uppercase;
+    }
+    .count-text strong { color: var(--text); }
+
+    /* ── name badge ── */
+    .name-badge {
+      font-size: 11px; letter-spacing: 0.2em;
+      color: rgba(255,255,255,0.2); text-transform: uppercase;
+    }
+
+    /* ── game starting overlay ── */
+    #startOverlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.95);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 18px; z-index: 20;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.35s;
+    }
+    #startOverlay.show { opacity: 1; pointer-events: all; }
+
+    .start-slot {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(38px, 12vw, 56px);
+      letter-spacing: 0.12em; line-height: 1;
+    }
+    .start-slot.s1 { color: #f0c040; }
+    .start-slot.s2 { color: #00e5ff; }
+    .start-slot.s3 { color: #ff3366; }
+    .start-slot.s4 { color: #44ff99; }
+
+    .start-desc {
+      font-size: 12px; letter-spacing: 0.2em;
+      color: rgba(255,255,255,0.35); text-transform: uppercase;
+    }
+
+    .start-loading {
+      font-size: 11px; letter-spacing: 0.2em;
+      color: rgba(255,255,255,0.2); text-transform: uppercase;
+      margin-top: 8px;
+    }
+    .start-loading::after {
+      content: ""; animation: dots 1.2s steps(4, end) infinite;
+    }
+    @keyframes dots { 0%{content:""} 25%{content:"."} 50%{content:".."} 75%{content:"..."} }
+
+    /* ── disconnected overlay ── */
+    #disconnected {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.9);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; z-index: 10; transition: opacity 0.3s;
+    }
+    #disconnected.hidden { opacity: 0; pointer-events: none; }
+    #disconnected p { color: white; font-size: 18px; font-weight: 700; margin: 0; letter-spacing: 0.1em; }
+    #disconnected button {
+      padding: 12px 32px; font-size: 14px; border: none; border-radius: 10px;
+      cursor: pointer; font-family: inherit; letter-spacing: 0.08em;
+    }
+    #reconnectBtn { background: var(--accent); color: #fff; }
+    #backBtn      { background: #1a1a1a; color: #555; }
+  </style>
+</head>
+<body>
+
+<div id="screen">
+  <div class="spinner-wrap">
+    <div class="spinner"></div>
+    <div class="spinner-inner"></div>
+  </div>
+
+  <div class="waiting-label">Waiting for<br>the console</div>
+
+  <div class="count-wrap">
+    <div class="count-pips" id="pips">
+      <div class="pip" id="pip1"></div>
+      <div class="pip" id="pip2"></div>
+      <div class="pip" id="pip3"></div>
+      <div class="pip" id="pip4"></div>
+    </div>
+    <div class="count-text" id="countText"><strong>0</strong> / 4 players connected</div>
+  </div>
+
+  <div class="name-badge" id="nameBadge"></div>
+</div>
+
+<!-- slot assigned / game starting overlay -->
+<div id="startOverlay">
+  <div class="start-slot" id="startSlotLabel"></div>
+  <div class="start-desc"  id="startSlotDesc"></div>
+  <div class="start-loading">Loading controller</div>
+</div>
+
+<!-- disconnected overlay -->
+<div id="disconnected" class="hidden">
+  <p>Disconnected</p>
+  <button id="reconnectBtn">Reconnect</button>
+  <button id="backBtn">Back to Join</button>
+</div>
+
+<script>
+function qs(k){ return new URLSearchParams(location.search).get(k); }
+
+const code = (qs("code")||"").toUpperCase();
+const name = qs("name")||"Player";
+if (!code) location.href = "join.html";
+
+const slotPages = { 1:"controller_p1.html", 2:"controller_p2.html", 3:"controller_p3.html", 4:"controller_p4.html" };
+const slotLabels = { 1:"PLAYER 1", 2:"PLAYER 2", 3:"PLAYER 3", 4:"PLAYER 4" };
+const slotDescs  = { 1:"Slider controller", 2:"Messenger", 3:"Action button", 4:"Display" };
+const slotClass  = { 1:"s1", 2:"s2", 3:"s3", 4:"s4" };
+
+let ws     = null;
+let mySlot = null;
+
+document.getElementById("nameBadge").textContent = name;
+
+function send(...parts){ if(ws && ws.readyState === WebSocket.OPEN) ws.send(parts.join("|")); }
+function parse(raw){ return raw.split("|"); }
+
+// ── Update player count display ───────────────────────────────────────────────
+function updateCount(count, total) {
+  document.getElementById("countText").innerHTML =
+    `<strong>${count}</strong> / ${total} players connected`;
+  for (let i = 1; i <= 4; i++) {
+    document.getElementById("pip" + i)?.classList.toggle("filled", i <= count);
+  }
+}
+
+// ── Slot assigned → show overlay then redirect ────────────────────────────────
+function onSlotAssigned(slot) {
+  mySlot = slot;
+  const overlay = document.getElementById("startOverlay");
+  const label   = document.getElementById("startSlotLabel");
+  const desc    = document.getElementById("startSlotDesc");
+
+  label.textContent = slotLabels[slot] || `PLAYER ${slot}`;
+  label.className   = "start-slot " + (slotClass[slot] || "");
+  desc.textContent  = slotDescs[slot] || "";
+
+  overlay.classList.add("show");
+}
+
+function goToController() {
+  if (!mySlot) return;
+  const params = new URLSearchParams({ code, name, slot: mySlot });
+  location.href = (slotPages[mySlot] || slotPages[1]) + "?" + params;
+}
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+function connect() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${proto}://${location.host}/ws?role=client&code=${encodeURIComponent(code)}&name=${encodeURIComponent(name)}`);
+
+  ws.onmessage = e => {
+    const [t,...a] = parse(e.data);
+
+    if (t === "joined") {
+      // Game was already running when we (re)connected
+      if (a[3] === "game") return; // slot_assigned + game_start follow immediately
+      heartbeat();
+    }
+
+    if (t === "waiting_state") {
+      updateCount(parseInt(a[0]||"0"), 4);
+    }
+
+    if (t === "slot_assigned") {
+      onSlotAssigned(parseInt(a[0]));
+    }
+
+    if (t === "game_start") {
+      // Give the overlay a moment to show the slot, then redirect
+      setTimeout(goToController, 1000);
+    }
+
+    if (t === "error") {
+      document.getElementById("disconnected").classList.remove("hidden");
+      document.querySelector("#disconnected p").textContent = a[0] || "Error";
+    }
+  };
+
+  ws.onclose = () => {
+    document.getElementById("disconnected").classList.remove("hidden");
+  };
+}
+
+function heartbeat() {
+  if (ws?.readyState === WebSocket.OPEN) { send("ping"); setTimeout(heartbeat, 10000); }
+}
+
+document.getElementById("reconnectBtn").onclick = () => {
+  document.getElementById("disconnected").classList.add("hidden");
+  connect();
+};
+document.getElementById("backBtn").onclick = () => location.href = "join.html";
+
+connect();
+</script>
+</body>
+</html>

@@ -187,7 +187,8 @@ let ws = null;
 const statusEl = document.getElementById("status");
 const feed     = document.getElementById("feed");
 const empty    = document.getElementById("empty");
-function send(o){ if(ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(o)); }
+function send(...parts){ if(ws && ws.readyState === WebSocket.OPEN) ws.send(parts.join("|")); }
+function parse(raw){ return raw.split("|"); }
 function escHtml(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function addMessage(text, from) {
   if (empty.parentNode === feed) feed.removeChild(empty);
@@ -209,25 +210,26 @@ function connect() {
   statusEl.textContent = "Connecting…";
 
   ws.onmessage = e => {
-    const msg = JSON.parse(e.data);
-    if (msg.t === "joined") {
+    const [t,...a] = parse(e.data);
+    if (t === "joined") {
       // If server assigned a different slot than expected, redirect to correct page
-      if (slotFromUrl && msg.slot !== slotFromUrl) {
-        const page = slotPages[msg.slot] || slotPages[1];
-        const p = new URLSearchParams({ code, name, slot: msg.slot });
+      const joinedSlot=parseInt(a[3]||"0");
+      if (slotFromUrl && joinedSlot !== slotFromUrl) {
+        const page = slotPages[joinedSlot] || slotPages[1];
+        const p = new URLSearchParams({ code, name, slot: joinedSlot });
         location.href = page + "?" + p;
         return;
       }
       const badge = document.querySelector(".slot-badge");
-      if (badge) badge.textContent = `Player ${msg.slot} · Slot 0${msg.slot}`;
+      if (badge) badge.textContent = `Player ${joinedSlot} · Slot 0${joinedSlot}`;
       statusEl.textContent = `Slot ${msg.slot} · ${name}`;
       document.getElementById("pad").classList.add("active");
       heartbeat();
     }
     
-    if (msg.t === "incoming_text") { addMessage(msg.text, msg.from||"Player 2"); }
-    if (msg.t === "slot_message"  && msg.payload?.text) { addMessage(msg.payload.text, msg.payload.from||"Host"); }
-    if (msg.t === "host_broadcast" && msg.payload?.text) { addMessage(msg.payload.text, msg.payload.from||"Host"); }
+    if (t === "incoming_text") { addMessage(a[0], a[1]||"Player 2"); }
+    if (t === "slot_message") { addMessage(a[0], a[1]||"Host"); }
+    if (t === "host_broadcast") { addMessage(a[0], a[1]||"Host"); }
 
   };
 
@@ -239,7 +241,7 @@ function connect() {
 }
 
 function heartbeat() {
-  if (ws?.readyState === WebSocket.OPEN) { send({ t: "ping" }); setTimeout(heartbeat, 10000); }
+  if (ws?.readyState === WebSocket.OPEN) { send("ping"); setTimeout(heartbeat, 10000); }
 }
 
 document.getElementById("reconnectBtn").onclick = () => {

@@ -57,6 +57,36 @@ public class PlayerInputRouter : MonoBehaviour
     // ---- Legacy d-pad (original controller) ----
     public virtual void OnButtonInput(string id, string btn, string state) { }
 
+    // ---- Waiting / queue callbacks ----
+
+    /// A player connected and entered the waiting queue. No slot assigned yet.
+    public virtual void OnPlayerQueued(string id, string name)
+    {
+        Debug.Log($"[Router] Queued: {name}");
+    }
+
+    /// A queued player disconnected before the game started.
+    public virtual void OnPlayerLeftQueue(string id, string name)
+    {
+        Debug.Log($"[Router] Left queue: {name}");
+    }
+
+    // ---- Lobby callbacks ----
+
+    /// Called every time any player's ready state changes or someone joins/leaves.
+
+    /// A player toggled their ready state.
+    public virtual void OnPlayerReady(string id, int slot, bool isReady)
+    {
+        Debug.Log($"[Router] P{slot} ready={isReady}");
+    }
+
+    /// Slots assigned, game started. Players fire OnPlayerJoined immediately after.
+    public virtual void OnGameStart()
+    {
+        Debug.Log("[Router] Game started!");
+    }
+
     // ---- Polling loop ----
     protected virtual void Update()
     {
@@ -82,7 +112,7 @@ public class PlayerInputRouter : MonoBehaviour
         var p3 = hostClient.GetSlot(3);
         if (p3 != null)
         {
-            if (p3.actionDown)
+            if (p3.actionPressed)
                 Debug.Log($"{p3.playerName} fired! (press #{p3.totalPresses})");
             // p3.actionDown → held state
         }
